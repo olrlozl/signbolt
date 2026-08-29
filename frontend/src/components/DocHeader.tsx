@@ -1,0 +1,20 @@
+import { FileIcon } from "./icons";
+
+interface Props {
+  filename: string;
+  meta?: string;
+}
+
+export default function DocHeader({ filename, meta }: Props) {
+  return (
+    <div className="doc-header">
+      <span className="doc-header-icon">
+        <FileIcon />
+      </span>
+      <div className="doc-header-body">
+        <h1 className="doc-header-name">{filename}</h1>
+        {meta && <p className="doc-header-meta">{meta}</p>}
+      </div>
+    </div>
+  );
+}

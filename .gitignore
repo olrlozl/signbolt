@@ -1,0 +1,21 @@
+# dependencies / build
+backend/.venv/
+frontend/node_modules/
+frontend/dist/
+
+# runtime data (uploads, SQLite, signed PDFs)
+backend/data/
+
+# caches
+backend/**/__pycache__/
+backend/.pytest_cache/
+frontend/node_modules/.package-lock.json
+
+# test fixture — real sign-in sheet with personal names; regenerate with
+#   python -m tests.make_sample
+backend/tests/fixtures/sample_signbook.pdf
+
+# local editor / tool settings
+.claude/settings.local.json
+.DS_Store
+*.log
