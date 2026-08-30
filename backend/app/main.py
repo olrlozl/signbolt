@@ -455,19 +455,31 @@ def signer_submit(sign_token: str, body: SubmitRequest) -> SubmitResponse:
 # --------------------------------------------------------------------------- #
 from pathlib import Path as _Path  # noqa: E402
 
-from fastapi.responses import FileResponse  # noqa: E402
+from fastapi import Request  # noqa: E402
+from fastapi.responses import FileResponse, HTMLResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 _DIST = _Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
+
+def _public_origin(request: Request) -> str:
+    return (
+        os.environ.get("SIGNBOLT_PUBLIC_ORIGIN")
+        or os.environ.get("RENDER_EXTERNAL_URL")
+        or str(request.base_url)
+    ).rstrip("/")
+
+
 if (_DIST / "index.html").is_file():
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
+    _INDEX = (_DIST / "index.html").read_text(encoding="utf-8")
 
     @app.get("/{path:path}", include_in_schema=False)
-    def _spa(path: str) -> FileResponse:
+    def _spa(request: Request, path: str):
         if path.startswith("api/"):
             raise HTTPException(status_code=404)
         candidate = _DIST / path
         if path and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(_DIST / "index.html")
+        # fill link-preview meta tags with the real origin
+        return HTMLResponse(_INDEX.replace("%OG_ORIGIN%", _public_origin(request)))
