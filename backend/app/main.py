@@ -447,3 +447,27 @@ def signer_submit(sign_token: str, body: SubmitRequest) -> SubmitResponse:
         remaining_names=workflow.remaining_names(doc_id),
         complete=complete,
     )
+
+
+# --------------------------------------------------------------------------- #
+# Serve the built React frontend (single-service production deploy).
+# In local dev the frontend runs on Vite (5173) and this block is inactive.
+# --------------------------------------------------------------------------- #
+from pathlib import Path as _Path  # noqa: E402
+
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_DIST = _Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+if (_DIST / "index.html").is_file():
+    app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    def _spa(path: str) -> FileResponse:
+        if path.startswith("api/"):
+            raise HTTPException(status_code=404)
+        candidate = _DIST / path
+        if path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_DIST / "index.html")

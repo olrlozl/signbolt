@@ -1,0 +1,16 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Free tier: one Docker web service, ephemeral disk (uploaded PDFs / signatures /
+# the SQLite DB reset on every deploy or restart — fine for testing).
+services:
+  - type: web
+    name: signbolt
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      # QR / sign links use RENDER_EXTERNAL_URL automatically — no config needed.
+      - key: SIGNBOLT_ADMIN_USER
+        sync: false # set your own value in the Render dashboard
+      - key: SIGNBOLT_ADMIN_PASSWORD
+        sync: false # set your own value in the Render dashboard

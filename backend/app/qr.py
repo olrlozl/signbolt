@@ -5,7 +5,11 @@ import os
 
 import segno
 
-PUBLIC_ORIGIN = os.environ.get("SIGNBOLT_PUBLIC_ORIGIN", "http://localhost:5173").rstrip("/")
+PUBLIC_ORIGIN = (
+    os.environ.get("SIGNBOLT_PUBLIC_ORIGIN")
+    or os.environ.get("RENDER_EXTERNAL_URL")  # set automatically on Render
+    or "http://localhost:5173"
+).rstrip("/")
 
 
 def sign_url(sign_token: str) -> str:

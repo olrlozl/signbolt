@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/dist
+backend/data
+backend/tests/fixtures/*.pdf
+.claude
+*.log
+.DS_Store
