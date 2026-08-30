@@ -51,6 +51,12 @@ def init() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def remove_doc_dir(doc_id: str) -> None:
+    d = doc_dir(doc_id)
+    if d.exists():
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def gc(known_ids: set[str]) -> None:
     """Remove on-disk doc dirs older than the TTL and not referenced by the DB."""
     if not DATA_DIR.exists():

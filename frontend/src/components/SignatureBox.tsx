@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Bbox } from "../types";
+import NameSelect from "./NameSelect";
 
 interface PxRect {
   x: number;
@@ -28,18 +29,19 @@ interface Props {
   signed?: string;
   nameOptions?: string[];
   emphasise?: boolean; // highlight mode: this is the current signer's box
+  flash?: boolean; // edit mode: briefly draw attention (e.g. just added)
   onOpen?: () => void;
   onRemove?: () => void;
   onChange?: (bbox_pdf: Bbox) => void;
   onAssign?: (name: string) => void;
+  onCustomName?: () => void; // open the "type a name" modal
 }
 
-// bottom-right corner is reserved for the × delete button
-const HANDLES = ["nw", "ne", "sw"] as const;
+// top-right corner is reserved for the × delete button
+const HANDLES = ["nw", "sw", "se"] as const;
 type DragMode = "move" | (typeof HANDLES)[number];
 const MIN_PX = 14;
 const THRESHOLD = 3;
-const CUSTOM = "__custom__";
 
 export default function SignatureBox({
   field,
@@ -50,10 +52,12 @@ export default function SignatureBox({
   signed,
   nameOptions = [],
   emphasise,
+  flash,
   onOpen,
   onRemove,
   onChange,
   onAssign,
+  onCustomName,
 }: Props) {
   const toPx = (b: Bbox): PxRect => ({
     x: b[0] * scale,
@@ -137,7 +141,7 @@ export default function SignatureBox({
     if (d.moved) onChange?.(toPdf(rect));
   }
 
-  const who = [field.rank, field.signer_name].filter(Boolean).join(" ");
+  const who = field.signer_name;
   const cls = [
     "sig-box",
     field.already_signed ? "already" : "",
@@ -146,6 +150,8 @@ export default function SignatureBox({
     mode === "highlight" ? "highlight" : "",
     emphasise ? "emph" : "",
     mode === "readonly" ? "readonly" : "",
+    flash ? "flash" : "",
+    editable && !field.signer_name.trim() ? "unnamed" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -171,32 +177,12 @@ export default function SignatureBox({
       }
     >
       {mode === "highlight" ? null : editable ? (
-        <select
-          className="name-select"
+        <NameSelect
           value={field.signer_name}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === CUSTOM) {
-              const typed = window.prompt("서명자 이름", field.signer_name);
-              if (typed != null) onAssign?.(typed.trim());
-            } else {
-              onAssign?.(v);
-            }
-          }}
-        >
-          <option value="">(이름 선택)</option>
-          <option value={CUSTOM}>+ 직접 입력…</option>
-          {field.signer_name && !nameOptions.includes(field.signer_name) && (
-            <option value={field.signer_name}>{field.signer_name}</option>
-          )}
-          {nameOptions.map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
+          options={nameOptions}
+          onPick={(n) => onAssign?.(n)}
+          onCustom={() => onCustomName?.()}
+        />
       ) : (
         <span className="label">{who || "서명란"}</span>
       )}

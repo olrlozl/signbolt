@@ -13,10 +13,12 @@ interface Props {
   signatures?: Record<string, string>;
   nameOptions?: string[];
   emphasiseName?: string;
+  flashId?: string | null;
   onOpen?: (field: PageViewField) => void;
   onRemove?: (id: string) => void;
   onChange?: (id: string, bbox: Bbox) => void;
   onAssign?: (id: string, name: string) => void;
+  onCustomName?: (id: string) => void;
 }
 
 export interface PageViewHandle {
@@ -32,10 +34,12 @@ const PageView = forwardRef<PageViewHandle, Props>(function PageView(
     signatures = {},
     nameOptions = [],
     emphasiseName,
+    flashId,
     onOpen,
     onRemove,
     onChange,
     onAssign,
+    onCustomName,
   },
   ref,
 ) {
@@ -79,10 +83,12 @@ const PageView = forwardRef<PageViewHandle, Props>(function PageView(
             signed={signatures[f.id]}
             nameOptions={nameOptions}
             emphasise={!!emphasiseName && f.signer_name === emphasiseName}
+            flash={f.id === flashId}
             onOpen={() => onOpen?.(f)}
             onRemove={() => onRemove?.(f.id)}
             onChange={(b) => onChange?.(f.id, b)}
             onAssign={(n) => onAssign?.(f.id, n)}
+            onCustomName={() => onCustomName?.(f.id)}
           />
         ))}
     </div>

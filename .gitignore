@@ -11,9 +11,9 @@ backend/**/__pycache__/
 backend/.pytest_cache/
 frontend/node_modules/.package-lock.json
 
-# test fixture — real sign-in sheet with personal names; regenerate with
-#   python -m tests.make_sample
-backend/tests/fixtures/sample_signbook.pdf
+# test fixtures — sign-in sheets with personal names; sample_signbook.pdf is
+# regenerated with `python -m tests.make_sample`
+backend/tests/fixtures/*.pdf
 
 # local editor / tool settings
 .claude/settings.local.json

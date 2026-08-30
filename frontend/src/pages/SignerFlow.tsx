@@ -4,7 +4,12 @@ import PageView, { type PageViewHandle } from "../components/PageView";
 import SignaturePadModal from "../components/SignaturePadModal";
 import StepNav from "../components/StepNav";
 import StepHeader from "../components/StepHeader";
-import { CheckIcon, ChevronRightIcon, PenIcon, RedoIcon } from "../components/icons";
+import {
+  CheckIcon,
+  ChevronRightIcon,
+  PenIcon,
+  RedoIcon,
+} from "../components/icons";
 import ProgressList from "../components/ProgressList";
 import { getSignerDoc, submitSignatures } from "../api";
 import { personsFromSignerFields } from "../lib/personStatus";
@@ -74,7 +79,9 @@ export default function SignerFlow() {
       setDone(true);
       window.scrollTo({ top: 0 });
       // refresh so the done screen shows up-to-date signing status
-      getSignerDoc(token).then(setDoc).catch(() => {});
+      getSignerDoc(token)
+        .then(setDoc)
+        .catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -83,8 +90,17 @@ export default function SignerFlow() {
   }
 
   if (error && !doc)
-    return <div className="signer"><div className="error">{error}</div></div>;
-  if (!doc) return <div className="signer"><p className="sub">불러오는 중…</p></div>;
+    return (
+      <div className="signer">
+        <div className="error">{error}</div>
+      </div>
+    );
+  if (!doc)
+    return (
+      <div className="signer">
+        <p className="sub">불러오는 중…</p>
+      </div>
+    );
 
   if (done) {
     return (
@@ -129,7 +145,11 @@ export default function SignerFlow() {
           />
           <div className="doc-scroll">
             {doc.pages.map((p) => (
-              <img key={p.index} src={p.image_url} alt={`페이지 ${p.index + 1}`} />
+              <img
+                key={p.index}
+                src={p.image_url}
+                alt={`페이지 ${p.index + 1}`}
+              />
             ))}
           </div>
         </>
@@ -168,7 +188,7 @@ export default function SignerFlow() {
           <StepHeader
             num={3}
             total={TOTAL}
-            title="서명"
+            title="서명하기"
             desc={
               allDrawn ? (
                 <>
@@ -178,9 +198,9 @@ export default function SignerFlow() {
               ) : (
                 <>
                   <b>{name}</b> 님의 서명란
-                  {myUnsigned.length > 1 ? ` ${myUnsigned.length}곳` : ""}입니다.
-                  하단 <b>서명하기</b> 버튼 또는 문서에서 강조된 칸을 눌러
-                  서명하세요.
+                  {myUnsigned.length > 1 ? ` ${myUnsigned.length}곳` : ""}
+                  입니다. 하단의 <b>서명하기</b> 버튼 또는{" "}
+                  <b>문서에 표시된 서명란</b>을 직접 선택해 서명하세요.
                 </>
               )
             }
@@ -245,15 +265,14 @@ export default function SignerFlow() {
           )
         }
         nextDisabled={
-          step === 2
-            ? !name
-            : step === 3
-              ? myUnsigned.length === 0
-              : false
+          step === 2 ? !name : step === 3 ? myUnsigned.length === 0 : false
         }
         onSecondary={
           step === 3 && allDrawn
-            ? () => setPadField(myUnsigned[0])
+            ? () => {
+                setSigs({}); // 처음부터 다시
+                setPadField(myUnsigned[0]);
+              }
             : undefined
         }
         secondaryLabel={

@@ -14,7 +14,7 @@ export default function ProgressList({ persons, highlightName }: Props) {
       <div className="status-head">
         <strong>서명 현황</strong>
         <span>
-          {done} / {persons.length} 완료
+          {done} / {persons.length} 명
         </span>
       </div>
       <div className="progress">

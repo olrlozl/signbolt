@@ -22,7 +22,7 @@ class SignatureField(BaseModel):
     rank: str = ""
     signer_name: str = ""          # person who must sign here
     bbox_pdf: List[float]          # [x0, y0, x1, y1], PyMuPDF coords (top-left origin)
-    source: str = "table"          # "table" | "manual"
+    source: str = "table"          # "table" | "seal" | "manual"
     already_signed: bool = False   # ink already present in the source PDF
 
 
@@ -61,12 +61,14 @@ class AdminDocView(BaseModel):
     id: str
     filename: str
     status: str
+    created_at: float
     pages: List[PageInfo]
     fields: List[SignatureField]
     sign_url: Optional[str] = None
     qr_svg: Optional[str] = None
     persons: List[PersonStatus] = []
     complete: bool = False
+    signed_field_ids: List[str] = []
 
 
 class PublishResponse(BaseModel):
@@ -75,10 +77,28 @@ class PublishResponse(BaseModel):
     qr_svg: str
 
 
+class AdminLogin(BaseModel):
+    username: str
+    password: str
+
+
+class AdminDocSummary(BaseModel):
+    id: str
+    admin_token: str
+    filename: str
+    status: str
+    created_at: float
+    published: bool
+    persons_total: int
+    persons_done: int
+    complete: bool
+
+
 class StatusView(BaseModel):
     status: str
     persons: List[PersonStatus]
     complete: bool
+    signed_field_ids: List[str] = []
 
 
 # -------------------------------------------------------------- signer side ---

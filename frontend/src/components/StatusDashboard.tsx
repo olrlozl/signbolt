@@ -8,7 +8,11 @@ interface Props {
   finalUrl: string;
 }
 
-export default function StatusDashboard({ persons, complete, finalUrl }: Props) {
+export default function StatusDashboard({
+  persons,
+  complete,
+  finalUrl,
+}: Props) {
   const done = persons.filter((p) => p.done).length;
   const pct = persons.length ? Math.round((done / persons.length) * 100) : 0;
   const [downloaded, setDownloaded] = useState(false);
@@ -18,7 +22,7 @@ export default function StatusDashboard({ persons, complete, finalUrl }: Props) 
       <div className="status-head">
         <strong>서명 현황</strong>
         <span>
-          {done} / {persons.length} 완료
+          {done} / {persons.length} 명
         </span>
       </div>
       <div className="progress">
@@ -47,11 +51,11 @@ export default function StatusDashboard({ persons, complete, finalUrl }: Props) 
         {downloaded ? <CheckIcon /> : <DownloadIcon />}
         {complete
           ? downloaded
-            ? "최종 PDF 다운로드됨"
-            : "최종 PDF 다운로드"
+            ? "최종 PDF 저장됨"
+            : "최종 PDF 저장"
           : downloaded
-            ? "서명본 다운로드됨"
-            : "현재까지 서명본 다운로드"}
+            ? "현재까지 서명본 저장됨"
+            : "현재까지 서명본 저장"}
       </a>
     </div>
   );

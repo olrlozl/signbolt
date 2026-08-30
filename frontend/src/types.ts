@@ -39,17 +39,32 @@ export interface AdminDocView {
   id: string;
   filename: string;
   status: DocStatus;
+  created_at: number;
   pages: PageInfo[];
   fields: SignatureField[];
   sign_url: string | null;
   qr_svg: string | null;
   persons: PersonStatus[];
   complete: boolean;
+  signed_field_ids: string[];
 }
 
 export interface StatusView {
   status: DocStatus;
   persons: PersonStatus[];
+  complete: boolean;
+  signed_field_ids: string[];
+}
+
+export interface AdminDocSummary {
+  id: string;
+  admin_token: string;
+  filename: string;
+  status: DocStatus;
+  created_at: number;
+  published: boolean;
+  persons_total: number;
+  persons_done: number;
   complete: boolean;
 }
 

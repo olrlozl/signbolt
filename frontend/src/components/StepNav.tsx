@@ -23,10 +23,12 @@ export default function StepNav({
   return (
     <nav className="step-nav">
       <div className="step-nav-inner">
-        <button className="btn" onClick={onBack} disabled={!onBack || busy}>
-          <ChevronLeftIcon />
-          이전
-        </button>
+        {onBack && (
+          <button className="btn" onClick={onBack} disabled={busy}>
+            <ChevronLeftIcon />
+            이전
+          </button>
+        )}
         <div className="step-nav-right">
           {onSecondary && (
             <button className="btn" onClick={onSecondary} disabled={busy}>

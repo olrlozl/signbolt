@@ -1,4 +1,5 @@
 import type {
+  AdminDocSummary,
   AdminDocView,
   FieldInputList,
   PublishResponse,
@@ -21,12 +22,63 @@ async function j<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ---- admin ----
+// ---- admin: login + document list ----
 
-export async function uploadPdf(file: File): Promise<UploadResponse> {
+import type { AdminCred } from "./lib/adminAuth";
+
+const credHeaders = (c: AdminCred) => ({
+  "X-Admin-User": c.user,
+  "X-Admin-Password": c.pw,
+});
+
+export async function adminLogin(
+  username: string,
+  password: string,
+): Promise<void> {
+  await j(
+    await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    }),
+  );
+}
+
+export async function listAdminDocs(
+  cred: AdminCred,
+): Promise<AdminDocSummary[]> {
+  return j(
+    await fetch("/api/admin/documents", { headers: credHeaders(cred) }),
+  );
+}
+
+export async function deleteAdminDoc(
+  id: string,
+  cred: AdminCred,
+): Promise<void> {
+  await j(
+    await fetch(`/api/admin/documents/${id}`, {
+      method: "DELETE",
+      headers: credHeaders(cred),
+    }),
+  );
+}
+
+// ---- admin: single document ----
+
+export async function uploadPdf(
+  file: File,
+  cred: AdminCred,
+): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
-  return j(await fetch("/api/documents", { method: "POST", body: form }));
+  return j(
+    await fetch("/api/documents", {
+      method: "POST",
+      headers: credHeaders(cred),
+      body: form,
+    }),
+  );
 }
 
 export async function getAdminDoc(
@@ -74,6 +126,14 @@ export function finalPdfUrl(id: string, token: string): string {
 
 export function qrPngUrl(id: string, token: string): string {
   return `/api/documents/${id}/qr.png?token=${encodeURIComponent(token)}`;
+}
+
+export function signaturePngUrl(
+  id: string,
+  token: string,
+  fieldId: string,
+): string {
+  return `/api/documents/${id}/signatures/${encodeURIComponent(fieldId)}.png?token=${encodeURIComponent(token)}`;
 }
 
 // ---- signer ----

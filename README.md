@@ -48,6 +48,21 @@ npm run dev        # http://localhost:5173  (/api 는 :8000 으로 프록시)
 
 브라우저에서 `http://localhost:5173` → PDF 업로드 → 이름 확인/보정 → **게시하고 QR 만들기**.
 
+### 관리자 로그인 / 문서 목록
+
+담당자 영역(문서 등록·목록)은 **관리자 아이디/비밀번호**로 게이트됩니다. `/` 로 들어가면
+로그인(`/admin`) → 문서 목록(`/admin/docs`) 순으로 이동합니다.
+
+```bash
+SIGNBOLT_ADMIN_USER=admin SIGNBOLT_ADMIN_PASSWORD=원하는비밀번호 \
+  .venv/bin/python -m uvicorn app.main:app --port 8000
+```
+미설정 시 기본값 `admin` / `admin1234` (개발용). 로그인 정보는 브라우저 `localStorage` 에 저장됩니다.
+
+- 목록에서 각 문서의 상태·서명 진행률을 보고, 행을 눌러 대시보드로 바로 진입
+  (token URL 을 따로 저장 안 해도 됨)
+- 서명자 링크(`/s/:token`)는 비밀번호와 무관 — 직원은 로그인 없이 서명
+
 ### 폰에서 서명 테스트 (같은 Wi-Fi)
 
 QR/링크의 도메인은 환경변수 `SIGNBOLT_PUBLIC_ORIGIN` 으로 정합니다. 폰이 접속하려면
@@ -76,6 +91,13 @@ cd backend
 실제 서명부 PDF 는 `backend/tests/fixtures/sample_signbook.pdf` 로 저장하면 그 파일로 검증합니다.
 
 ## API
+
+### 관리자 목록 (`X-Admin-Password` 헤더)
+
+| Method | Path | 설명 |
+|---|---|---|
+| POST | `/api/admin/login` | `{password}` 검증 |
+| GET  | `/api/admin/documents` | 전체 문서 요약 목록 (id·admin_token·status·진행률) |
 
 ### 담당자 (`?token=<admin_token>` 필요)
 

@@ -1,18 +1,22 @@
 from __future__ import annotations
 
+import hmac
+import os
 import time
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
 import fitz
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
 from . import db, qr, store, workflow
 from .detector import detect_signature_fields
 from .models import (
+    AdminDocSummary,
     AdminDocView,
+    AdminLogin,
     FieldsUpdate,
     PageInfo,
     PublishResponse,
@@ -50,6 +54,68 @@ db.init_db()
 @app.get("/api/health")
 def health() -> dict:
     return {"ok": True}
+
+
+# ------------------------------------------------------------ admin login ---
+
+def _admin_user() -> str:
+    return os.environ.get("SIGNBOLT_ADMIN_USER", "admin")
+
+
+def _admin_password() -> str:
+    return os.environ.get("SIGNBOLT_ADMIN_PASSWORD", "admin1234")
+
+
+def _check_admin(user: Optional[str], pw: Optional[str]) -> None:
+    ok_user = bool(user) and hmac.compare_digest(user, _admin_user())
+    ok_pw = bool(pw) and hmac.compare_digest(pw, _admin_password())
+    if not (ok_user and ok_pw):
+        raise HTTPException(401, "아이디 또는 비밀번호가 올바르지 않습니다.")
+
+
+@app.post("/api/admin/login")
+def admin_login(body: AdminLogin) -> dict:
+    _check_admin(body.username, body.password)
+    return {"ok": True}
+
+
+@app.delete("/api/admin/documents/{doc_id}")
+def admin_delete_document(
+    doc_id: str,
+    x_admin_user: Optional[str] = Header(None),
+    x_admin_password: Optional[str] = Header(None),
+) -> dict:
+    _check_admin(x_admin_user, x_admin_password)
+    if db.get_document(doc_id) is None:
+        raise HTTPException(404, "문서를 찾을 수 없습니다.")
+    db.delete_document(doc_id)
+    store.remove_doc_dir(doc_id)
+    return {"ok": True}
+
+
+@app.get("/api/admin/documents", response_model=List[AdminDocSummary])
+def admin_documents(
+    x_admin_user: Optional[str] = Header(None),
+    x_admin_password: Optional[str] = Header(None),
+) -> List[AdminDocSummary]:
+    _check_admin(x_admin_user, x_admin_password)
+    out: List[AdminDocSummary] = []
+    for row in db.list_documents():
+        people = workflow.person_statuses(row["id"])
+        out.append(
+            AdminDocSummary(
+                id=row["id"],
+                admin_token=row["admin_token"],
+                filename=row["filename"],
+                status=row["status"],
+                created_at=row["created_at"],
+                published=bool(row["sign_token"]),
+                persons_total=len(people),
+                persons_done=sum(1 for p in people if p.done),
+                complete=workflow.is_complete(row["id"]),
+            )
+        )
+    return out
 
 
 # ---------------------------------------------------------------- helpers ---
@@ -108,7 +174,12 @@ def _clamp_bbox(bbox: List[float], pr) -> List[float]:
 # ------------------------------------------------------------ admin routes ---
 
 @app.post("/api/documents", response_model=UploadResponse)
-async def upload_document(file: UploadFile = File(...)) -> UploadResponse:
+async def upload_document(
+    file: UploadFile = File(...),
+    x_admin_user: Optional[str] = Header(None),
+    x_admin_password: Optional[str] = Header(None),
+) -> UploadResponse:
+    _check_admin(x_admin_user, x_admin_password)
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(400, "PDF 파일만 업로드할 수 있습니다.")
     pdf_bytes = await file.read()
@@ -146,6 +217,7 @@ def get_document(doc_id: str, token: Optional[str] = Query(None)) -> AdminDocVie
         id=doc_id,
         filename=row["filename"],
         status=row["status"],
+        created_at=row["created_at"],
         pages=_page_infos(doc_id, store.source_pdf(doc_id),
                           f"/api/documents/{doc_id}/pages"),
         fields=workflow.fields_for_admin(doc_id),
@@ -153,7 +225,23 @@ def get_document(doc_id: str, token: Optional[str] = Query(None)) -> AdminDocVie
         qr_svg=qr.make_qr_svg(sign_url) if sign_url else None,
         persons=workflow.person_statuses(doc_id),
         complete=workflow.is_complete(doc_id),
+        signed_field_ids=sorted(db.signed_field_ids(doc_id)),
     )
+
+
+@app.get("/api/documents/{doc_id}/signatures/{field_id}.png")
+def admin_signature_image(
+    doc_id: str, field_id: str, token: Optional[str] = Query(None)
+) -> Response:
+    _require_admin(doc_id, token)
+    try:
+        path = store.signature_png(doc_id, field_id)
+    except ValueError:
+        raise HTTPException(400, "잘못된 서명란 id입니다.")
+    if not path.exists():
+        raise HTTPException(404, "아직 서명되지 않았습니다.")
+    return Response(content=path.read_bytes(), media_type="image/png",
+                    headers={"Cache-Control": "no-store"})
 
 
 @app.put("/api/documents/{doc_id}/fields", response_model=AdminDocView)
@@ -220,6 +308,7 @@ def document_status(
         status=row["status"],
         persons=workflow.person_statuses(doc_id),
         complete=workflow.is_complete(doc_id),
+        signed_field_ids=sorted(db.signed_field_ids(doc_id)),
     )
 
 

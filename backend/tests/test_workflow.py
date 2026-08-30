@@ -15,10 +15,17 @@ FIXTURE = Path(__file__).parent / "fixtures" / "sample_signbook.pdf"
 pytestmark = pytest.mark.skipif(not FIXTURE.exists(), reason="no sample PDF")
 
 
+ADMIN_USER = "test-admin"
+ADMIN_PW = "test-pw"
+ADMIN_HEADERS = {"X-Admin-User": ADMIN_USER, "X-Admin-Password": ADMIN_PW}
+
+
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     # isolate DB + data dir per test
     monkeypatch.setenv("SIGNBOLT_PUBLIC_ORIGIN", "http://testhost:5173")
+    monkeypatch.setenv("SIGNBOLT_ADMIN_USER", ADMIN_USER)
+    monkeypatch.setenv("SIGNBOLT_ADMIN_PASSWORD", ADMIN_PW)
     import importlib
 
     from app import store
@@ -50,7 +57,24 @@ def _upload(client) -> dict:
     return client.post(
         "/api/documents",
         files={"file": ("s.pdf", FIXTURE.read_bytes(), "application/pdf")},
+        headers=ADMIN_HEADERS,
     ).json()
+
+
+def test_upload_requires_admin_credentials(client):
+    files = {"file": ("s.pdf", FIXTURE.read_bytes(), "application/pdf")}
+    assert client.post("/api/documents", files=files).status_code == 401
+    assert client.post(
+        "/api/documents", files=files, headers={"X-Admin-Password": ADMIN_PW}
+    ).status_code == 401  # missing user
+    assert client.post(
+        "/api/admin/login", json={"username": ADMIN_USER, "password": "bad"}
+    ).status_code == 401
+    assert client.post(
+        "/api/admin/login", json={"username": ADMIN_USER, "password": ADMIN_PW}
+    ).status_code == 200
+    r = client.get("/api/admin/documents", headers=ADMIN_HEADERS)
+    assert r.status_code == 200 and r.json() == []
 
 
 def test_upload_detects_and_names(client):
@@ -60,6 +84,26 @@ def test_upload_detects_and_names(client):
     assert {f["signer_name"] for f in u["fields"]} == {
         "이성수", "이진아", "이현지", "이은지", "이준석", "배정우", "홍길동",
     }
+
+
+def test_delete_document(client):
+    u = _upload(client)
+    did = u["id"]
+    client.post(f"/api/documents/{did}/publish?token={u['admin_token']}")
+    # signer signs one field so there's a signature + final.pdf on disk
+    stok = client.get(f"/api/documents/{did}/status?token={u['admin_token']}")
+    assert stok.status_code == 200
+
+    assert client.delete(f"/api/admin/documents/{did}").status_code == 401
+    r = client.delete(f"/api/admin/documents/{did}", headers=ADMIN_HEADERS)
+    assert r.status_code == 200
+    assert client.get(
+        f"/api/documents/{did}?token={u['admin_token']}"
+    ).status_code == 404
+    assert client.delete(
+        f"/api/admin/documents/{did}", headers=ADMIN_HEADERS
+    ).status_code == 404
+    assert client.get("/api/admin/documents", headers=ADMIN_HEADERS).json() == []
 
 
 def test_multiple_documents_do_not_collide(client):

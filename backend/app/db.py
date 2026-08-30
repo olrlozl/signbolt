@@ -150,6 +150,19 @@ def all_document_ids() -> set:
         return {r["id"] for r in conn.execute("SELECT id FROM documents")}
 
 
+def list_documents() -> List[sqlite3.Row]:
+    with connection() as conn:
+        return conn.execute(
+            "SELECT * FROM documents ORDER BY created_at DESC"
+        ).fetchall()
+
+
+def delete_document(doc_id: str) -> None:
+    """Removes the document; fields + signatures cascade (FK ON DELETE CASCADE)."""
+    with writing() as conn:
+        conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+
+
 # ------------------------------------------------------------------- fields ---
 
 def namespaced_id(doc_id: str, raw_id: str) -> str:

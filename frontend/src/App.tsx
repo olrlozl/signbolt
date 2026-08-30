@@ -1,22 +1,26 @@
-import { Navigate, Route, Routes } from "react-router-dom";
-import AdminUpload from "./pages/AdminUpload";
-import AdminEditor from "./pages/AdminEditor";
-import SignerFlow from "./pages/SignerFlow";
+import { Link, Outlet, useLocation } from "react-router-dom";
 import Logo from "./components/Logo";
 
 export default function App() {
+  const { pathname } = useLocation();
+  const bare = pathname === "/admin"; // login screen has its own layout
+  const isSigner = pathname.startsWith("/s/");
+
   return (
     <>
-      <header className="app-header">
-        <Logo />
-        <span className="credit">𝒷𝓎 ⒺⓊⓃⒿⒾ</span>
-      </header>
-      <Routes>
-        <Route path="/" element={<AdminUpload />} />
-        <Route path="/d/:id" element={<AdminEditor />} />
-        <Route path="/s/:token" element={<SignerFlow />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      {!bare && (
+        <header className="app-header">
+          {isSigner ? (
+            <Logo />
+          ) : (
+            <Link to="/admin/docs" className="logo-link" aria-label="문서 목록">
+              <Logo />
+            </Link>
+          )}
+          <span className="credit">𝒷𝓎 ⒺⓊⓃⒿⒾ</span>
+        </header>
+      )}
+      <Outlet />
     </>
   );
 }

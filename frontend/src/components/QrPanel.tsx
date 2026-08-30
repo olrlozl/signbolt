@@ -22,7 +22,8 @@ const esc = (s: string) =>
 export default function QrPanel({ signUrl, qrPngUrl, docName }: Props) {
   const title = docName.replace(/\.pdf$/i, "");
   const titleLine = `[${title}] 서명 요청`;
-  const body = "아래 링크를 열거나 QR을 스캔해 본인 이름을 선택하고 서명해 주세요.";
+  const body =
+    "아래 링크를 열거나 QR을 스캔해 본인 이름을 선택하고 서명해 주세요.";
   const plain = `${titleLine}\n\n${body}\n${signUrl}`;
 
   const [err, setErr] = useState<string | null>(null);
@@ -68,6 +69,9 @@ export default function QrPanel({ signUrl, qrPngUrl, docName }: Props) {
   return (
     <div className="qr-panel">
       <strong>서명 요청 보내기</strong>
+      <p className="qr-sub">
+        아래 메시지를 메신저나 이메일로 공유해 서명을 요청하세요.
+      </p>
       <div className="qr-preview">
         <p className="qr-title-line">{titleLine}</p>
         <p className="qr-body-line">{body}</p>
@@ -96,7 +100,7 @@ export default function QrPanel({ signUrl, qrPngUrl, docName }: Props) {
           }}
         >
           {savedQr ? <CheckIcon /> : <DownloadIcon />}
-          {savedQr ? "QR 저장됨" : "QR 이미지 저장"}
+          {savedQr ? "QR 이미지 저장됨" : "QR 이미지 저장"}
         </a>
       </div>
       {err && <p className="qr-msg warn">{err}</p>}
