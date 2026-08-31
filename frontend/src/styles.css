@@ -935,6 +935,8 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 70;
+  overscroll-behavior: contain;
+  touch-action: none;
 }
 
 .modal {
@@ -1391,6 +1393,10 @@ body {
   max-width: 720px;
   margin: 0 auto;
   padding: 10px 14px 88px;
+  /* nothing here is meant to be selected; touch signing must not grab text */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 .big-sign {
   font-size: 16px;

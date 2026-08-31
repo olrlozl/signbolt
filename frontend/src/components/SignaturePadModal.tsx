@@ -58,6 +58,19 @@ export default function SignaturePadModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // lock background (document) scroll while the pad is open
+  useEffect(() => {
+    const body = document.body.style;
+    const html = document.documentElement.style;
+    const prev = { b: body.overflow, h: html.overflow };
+    body.overflow = "hidden";
+    html.overflow = "hidden";
+    return () => {
+      body.overflow = prev.b;
+      html.overflow = prev.h;
+    };
+  }, []);
+
   function pos(e: React.PointerEvent<HTMLCanvasElement>) {
     const c = canvasRef.current!;
     const r = c.getBoundingClientRect();
