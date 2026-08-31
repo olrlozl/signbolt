@@ -721,6 +721,16 @@ body {
   color: #fff;
 }
 
+.btn.accent {
+  background: var(--accent-weak);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.btn.accent:hover:not(:disabled) {
+  background: rgba(47, 111, 237, 0.2);
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -1120,6 +1130,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .name-menu-item {
   display: flex;

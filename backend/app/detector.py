@@ -221,12 +221,18 @@ def detect_seals_in_page(
                 continue
 
             # name: a hangul prefix inside the marker's own word ("홍길동(인)"),
-            # else the nearest hangul 2-4 char word to the left on this line
+            # else the nearest hangul 2-4 char word to the left on this line.
+            # seal_left = x where the "(인)" itself starts, so the box can begin
+            # there and never cover the preceding name.
             name = ""
+            seal_left = mx0
             lead = ws[first][4]
             cut = min((lead.find(c) for c in "（(" if c in lead), default=-1)
             if cut > 0 and _NAME_RE.match(lead[:cut]):
                 name = lead[:cut]
+                if lead:  # glued "홍길동(인)" — estimate where "(" sits
+                    ww = ws[first][2] - ws[first][0]
+                    seal_left = ws[first][0] + (cut / len(lead)) * ww
             else:
                 for i in range(first - 1, -1, -1):
                     tok = ws[i][4].strip(" .,:;·-")
@@ -236,15 +242,19 @@ def detect_seals_in_page(
                     if len(tok) > 4:
                         break
 
-            # a signing area over the "(인)" marker itself, centred on it and
+            # a signing area starting at "(인)" and extending to the right,
             # reaching a little above the line
             th = max(my1 - my0, 8.0)
-            cx = (mx0 + mx1) / 2
-            w = max(mx1 - mx0, 55.0)
+            w = max(mx1 - seal_left, 60.0)
+            x0 = seal_left - 2
+            x1 = x0 + w
+            if x1 > pr.width - 1:
+                x1 = pr.width - 1
+                x0 = max(1.0, x1 - w)
             box = [
-                max(1.0, round(cx - w / 2, 2)),
+                max(1.0, round(x0, 2)),
                 max(1.0, round(my0 - th * 0.35, 2)),
-                min(pr.width - 1, round(cx + w / 2, 2)),
+                round(x1, 2),
                 min(pr.height - 1, round(my1 + th * 0.15, 2)),
             ]
             if box[2] - box[0] < 3 or box[3] - box[1] < 3:

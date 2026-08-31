@@ -1,4 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import { CheckIcon } from "./icons";
 
@@ -25,9 +31,16 @@ export default function NameSelect({ value, options, onPick, onCustom }: Props) 
 
   const opts = value && !options.includes(value) ? [value, ...options] : options;
 
-  useLayoutEffect(() => {
-    if (!open || !btnRef.current) return;
-    const r = btnRef.current.getBoundingClientRect();
+  // position the menu against the button (also re-run while scrolling so the
+  // menu follows its anchor instead of getting dismissed)
+  const place = useCallback(() => {
+    const b = btnRef.current;
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight) {
+      setOpen(false); // anchor scrolled out of view
+      return;
+    }
     const width = Math.min(Math.max(r.width, 150), 240);
     let left = r.left;
     if (left + width > window.innerWidth - 8) left = window.innerWidth - 8 - width;
@@ -44,17 +57,20 @@ export default function NameSelect({ value, options, onPick, onCustom }: Props) 
         ? { bottom: window.innerHeight - r.top + 4 }
         : { top: r.bottom + 4 }),
     });
-  }, [open]);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (open) place();
+  }, [open, place]);
 
   useEffect(() => {
     if (!open) return;
-    const close = () => setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    const onScroll = (e: Event) => {
-      // scrolling inside the menu's own list must not dismiss it
-      if (menuRef.current?.contains(e.target as Node)) return;
-      setOpen(false);
+    let raf = 0;
+    const reposition = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(place);
     };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     const onDown = (e: MouseEvent) => {
       if (
         !menuRef.current?.contains(e.target as Node) &&
@@ -62,17 +78,18 @@ export default function NameSelect({ value, options, onPick, onCustom }: Props) 
       )
         setOpen(false);
     };
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", close);
+    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", reposition);
     window.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onDown);
     return () => {
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", close);
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", reposition);
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onDown);
     };
-  }, [open]);
+  }, [open, place]);
 
   const pick = (fn: () => void) => {
     setOpen(false);

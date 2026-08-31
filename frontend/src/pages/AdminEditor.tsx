@@ -204,12 +204,37 @@ export default function AdminEditor() {
     const ref = fields.length ? fields : doc.fields;
     const w = median(ref.map((f) => f.bbox_pdf[2] - f.bbox_pdf[0])) || 110;
     const h = median(ref.map((f) => f.bbox_pdf[3] - f.bbox_pdf[1])) || 30;
-    // drop new boxes near the top of page 1 (usually empty), stacking downward
-    // so they never land on top of the detected table or each other
-    const manualCount = fields.filter((f) => f.source === "manual").length;
-    const x = pg.width / 2 - w / 2;
-    let y = 18 + manualCount * (h + 5);
-    if (y + h > pg.height - 18) y = 18;
+
+    // find a spot on page 1 that doesn't overlap any existing box: cascade
+    // down from the top-left, wrap to a new column, keeping a small gap
+    const GAP = 8;
+    const M = 16; // page margin
+    const boxes = fields
+      .filter((f) => f.page === pg.index)
+      .map((f) => f.bbox_pdf);
+    const overlaps = (x: number, y: number) =>
+      boxes.some(
+        (b) =>
+          x < b[2] + GAP &&
+          x + w > b[0] - GAP &&
+          y < b[3] + GAP &&
+          y + h > b[1] - GAP,
+      );
+    let x = M;
+    let y = M;
+    let guard = 0;
+    while (overlaps(x, y) && guard++ < 500) {
+      y += h + GAP;
+      if (y + h > pg.height - M) {
+        y = M;
+        x += w + GAP;
+        if (x + w > pg.width - M) {
+          x = M; // page is packed — give up and stack at the corner
+          y = M;
+          break;
+        }
+      }
+    }
 
     const newId = `manual-${Date.now()}`;
     setFields((prev) => [
@@ -341,7 +366,7 @@ export default function AdminEditor() {
                       : " · 자동 저장됨"}
                 </span>
               </span>
-              <button className="btn" onClick={addField}>
+              <button className="btn accent" onClick={addField}>
                 + 서명란 추가
               </button>
               <button

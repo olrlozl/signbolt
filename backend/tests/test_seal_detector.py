@@ -44,18 +44,20 @@ def test_marker_becomes_field_matched_to_preceding_name():
     assert all(f.source == "seal" for f in fields)
 
 
-def test_box_sits_above_the_marker():
+def test_box_starts_at_marker_and_extends_right():
     pdf = _pdf([(300, "홍길동 (인)")])
     fields = detect_signature_fields(pdf)
     assert len(fields) == 1
     box = fields[0].bbox_pdf
 
     page = fitz.open(stream=pdf, filetype="pdf")[0]
+    name = page.search_for("홍길동")[0]
     marker = page.search_for("(인)")[0]
     assert box[1] < marker.y0                     # box reaches above the marker
     assert box[3] < marker.y1 + marker.height     # stays on the marker line
-    box_cx = (box[0] + box[2]) / 2
-    assert abs(box_cx - (marker.x0 + marker.x1) / 2) < 6   # centred on "(인)"
+    assert box[0] >= name.x1 - 4                  # does not cover the name
+    assert box[0] <= marker.x0 + 4                # starts at "(인)"
+    assert box[2] > marker.x1                     # extends to the right
     assert box[2] - box[0] > 3 and box[3] - box[1] > 3
 
 
