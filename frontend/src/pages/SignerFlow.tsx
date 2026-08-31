@@ -41,7 +41,10 @@ export default function SignerFlow() {
     () => (doc ? doc.fields.filter((f) => f.signer_name === name) : []),
     [doc, name],
   );
-  const myUnsigned = myFields.filter((f) => !f.signed);
+  const myUnsigned = useMemo(
+    () => myFields.filter((f) => !f.signed),
+    [myFields],
+  );
   const toDraw = myUnsigned.filter((f) => !sigs[f.id]);
   const allDrawn = myUnsigned.length > 0 && toDraw.length === 0;
 
@@ -50,8 +53,15 @@ export default function SignerFlow() {
     setSigs({});
   }, [name]);
 
+  // once, when step 3 first appears: bring the signer's box into view
+  const scrolledToBox = useRef(false);
   useEffect(() => {
-    if (step !== 3 || !doc || myUnsigned.length === 0) return;
+    if (step !== 3) {
+      scrolledToBox.current = false;
+      return;
+    }
+    if (scrolledToBox.current || !doc || myUnsigned.length === 0) return;
+    scrolledToBox.current = true;
     const first = myUnsigned[0];
     const t = setTimeout(
       () => pageRefs.current[first.page]?.scrollFieldIntoView(first.id),
@@ -63,6 +73,18 @@ export default function SignerFlow() {
   function go(next: number) {
     setStep(next);
     window.scrollTo({ top: 0 });
+  }
+
+  // open the signature pad with the page reset to the top behind it
+  function openPad(f: SignerField) {
+    window.scrollTo({ top: 0 });
+    setPadField(f);
+  }
+
+  // on close, bring that signature box back into view
+  function closePad(f: SignerField) {
+    setPadField(null);
+    setTimeout(() => pageRefs.current[f.page]?.scrollFieldIntoView(f.id), 60);
   }
 
   async function submit() {
@@ -220,7 +242,7 @@ export default function SignerFlow() {
                   signatures={sigs}
                   onOpen={(f) => {
                     const sf = myUnsigned.find((x) => x.id === f.id);
-                    if (sf) setPadField(sf);
+                    if (sf) openPad(sf);
                   }}
                 />
               ))}
@@ -241,7 +263,7 @@ export default function SignerFlow() {
               : myUnsigned.length === 0
                 ? undefined
                 : toDraw.length > 0
-                  ? () => setPadField(toDraw[0])
+                  ? () => openPad(toDraw[0])
                   : submit
         }
         nextLabel={
@@ -271,7 +293,7 @@ export default function SignerFlow() {
           step === 3 && allDrawn
             ? () => {
                 setSigs({}); // 처음부터 다시
-                setPadField(myUnsigned[0]);
+                openPad(myUnsigned[0]);
               }
             : undefined
         }
@@ -289,10 +311,10 @@ export default function SignerFlow() {
           fullscreen
           bbox_pdf={padField.bbox_pdf}
           who={`${name} 님 서명`}
-          onCancel={() => setPadField(null)}
+          onCancel={() => closePad(padField)}
           onSave={(png) => {
             setSigs((prev) => ({ ...prev, [padField.id]: png }));
-            setPadField(null);
+            closePad(padField);
           }}
         />
       )}

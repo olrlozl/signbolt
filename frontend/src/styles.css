@@ -1378,6 +1378,26 @@ body {
 .person-list li.done .pbadge {
   color: var(--done);
 }
+.status-done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--done-weak);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.status-done svg {
+  flex: none;
+  font-size: 16px;
+  color: var(--done);
+}
+.status-done b {
+  color: var(--done);
+}
 .btn.block {
   display: block;
   text-align: center;
