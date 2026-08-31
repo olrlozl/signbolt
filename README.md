@@ -13,6 +13,28 @@
 
 ---
 
+# 데모
+
+<table>
+  <tr>
+    <td align="center" width="63%">
+      <b>① 로그인 · 서류등록 · 서명란 자동인식 · 게시</b><br><br>
+       <video src="https://github.com/user-attachments/assets/15cbabf8-1a27-4e91-9280-fb028cb36a34" controls width="100%"></video>
+    </td>
+    <td align="center" valign="top" width="37%" rowspan="2">
+      <b>③ QR 스캔 · 모바일 서명</b><br><br>
+      <video src="https://github.com/user-attachments/assets/e67f6091-43c0-4820-aadc-3ea7b5b11260" controls width="100%"></video>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <b>② 서명 현황 실시간 반영 · 최종 PDF 저장  </b><br><br>
+      <video src="https://github.com/user-attachments/assets/d85fc6ae-a2c9-42f5-9d63-c6ec379d679a" controls width="100%"></video>
+  </tr>
+</table>
+
+---
+
 ## 프로젝트 배경
 
 - 다수 서명이 필요한 사내 서류 처리 시, 담당자가 직접 서명자를 찾아다니고 수합 후 스캔까지 해야 하는 번거로움 존재
