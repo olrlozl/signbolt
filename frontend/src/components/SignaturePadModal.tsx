@@ -70,7 +70,7 @@ export default function SignaturePadModal({
   return (
     <div className="modal-backdrop" onMouseDown={onCancel}>
       <div
-        className={fullscreen ? "modal modal-full" : "modal"}
+        className={`modal pad-modal${fullscreen ? " modal-full" : ""}`}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <h2>서명 입력</h2>

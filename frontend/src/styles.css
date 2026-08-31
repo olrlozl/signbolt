@@ -1585,6 +1585,13 @@ body {
   border-radius: 4px;
 }
 
+/* signature pad: no text selection / long-press callout while drawing */
+.pad-modal {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
 .modal.modal-full {
   width: 96vw;
   max-width: 960px;
