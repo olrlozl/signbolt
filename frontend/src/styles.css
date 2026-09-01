@@ -434,63 +434,119 @@ body {
   color: var(--muted);
 }
 
-/* sticky step header (admin upload → editor), same shape as signer StepHeader */
-.admin-steps {
+/* sticky 4-stage progress header, shared by every admin screen */
+.doc-steps {
   position: sticky;
   top: 44px; /* below the 44px fixed app-header */
   z-index: 22;
   margin: 0 -20px 18px;
-  padding: 12px 20px 14px;
+  padding: 14px 20px 15px;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 .app > .docs-back {
   margin-bottom: 10px;
 }
-.admin-steps-dots {
+.doc-steps-track {
   display: flex;
-  gap: 6px;
+  align-items: flex-start;
+  list-style: none;
+  margin: 0;
+  padding: 2px 0 0;
+  max-width: 680px; /* 4 steps × .doc-step max-width */
 }
-.admin-steps-dots i {
-  width: 26px;
-  height: 4px;
+.doc-step {
+  flex: 1 1 0;
+  max-width: 170px;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  text-align: left;
+}
+/* last step only needs room for its own mark + label, not a full column */
+.doc-step:last-child {
+  flex: 0 0 auto;
+}
+/* connector: from this mark's centre forward to the next mark's centre.
+ * grey track with a blue fill that grows left→right as the step completes */
+.doc-step::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 13px;
+  right: -13px;
+  height: 3px;
   border-radius: 2px;
-  background: var(--border);
-  transition: background 0.15s;
+  background-color: var(--border);
+  background-image: linear-gradient(var(--accent), var(--accent));
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  transition: background-size 0.45s ease;
 }
-.admin-steps-dots i.on {
-  background: var(--accent);
+.doc-step:last-child::after {
+  display: none;
 }
-.admin-steps-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
+.doc-step.done::after {
+  background-size: 100% 100%;
 }
-.admin-steps-badge {
+.doc-step-mark {
+  position: relative;
+  z-index: 1;
   flex: none;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
+  background: var(--panel);
+  border: 2px solid var(--border);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
 }
-.admin-steps-title h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+.doc-step.done .doc-step-mark,
+.doc-step.current .doc-step-mark {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.doc-step.current .doc-step-mark {
+  box-shadow: 0 0 0 4px var(--accent-weak);
+}
+.doc-step.done .doc-step-mark svg {
+  font-size: 13px;
+}
+.doc-step-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.doc-step.done .doc-step-label,
+.doc-step.current .doc-step-label {
   color: var(--ink);
 }
-.admin-steps p {
-  margin: 8px 0 0;
+.doc-steps-desc {
+  margin: 11px 0 0;
+  max-width: 680px; /* match the step track width */
   font-size: 13px;
   line-height: 1.5;
   color: var(--muted);
+}
+@media (max-width: 380px) {
+  .doc-step-label {
+    font-size: 11px;
+  }
 }
 
 /* transient bottom toast */
@@ -1391,26 +1447,6 @@ body {
   color: var(--warn);
 }
 .person-list li.done .pbadge {
-  color: var(--done);
-}
-.status-done {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 2px 0 12px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: var(--done-weak);
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--ink);
-}
-.status-done svg {
-  flex: none;
-  font-size: 16px;
-  color: var(--done);
-}
-.status-done b {
   color: var(--done);
 }
 .btn.block {

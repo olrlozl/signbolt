@@ -20,7 +20,9 @@ export default function NewDocDropzone() {
         return;
       }
       const res = await uploadPdf(file, cred);
-      nav(`/d/${res.id}?token=${encodeURIComponent(res.admin_token)}`);
+      nav(`/d/${res.id}?token=${encodeURIComponent(res.admin_token)}`, {
+        state: { justUploaded: true },
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("아이디") || msg.includes("비밀번호")) {

@@ -43,7 +43,7 @@ export default function UploadDropzone({ onFile, disabled }: Props) {
       <span>
         {disabled
           ? "잠시만 기다려 주세요"
-          : "클릭해서 파일 선택 · PDF 최대 25MB"}
+          : "또는 클릭해서 파일 선택 · PDF 최대 25MB"}
       </span>
       <input
         ref={inputRef}

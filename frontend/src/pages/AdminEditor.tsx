@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useBlocker, useParams, useSearchParams } from "react-router-dom";
+import {
+  useBlocker,
+  useLocation,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import PageView, {
   type PageViewField,
   type PageViewHandle,
 } from "../components/PageView";
 import DocHeader from "../components/DocHeader";
-import AdminSteps from "../components/AdminSteps";
+import DocSteps from "../components/DocSteps";
 import BackToDocs from "../components/BackToDocs";
 import NameInputModal from "../components/NameInputModal";
 import { formatDateTime } from "../lib/format";
@@ -49,6 +54,16 @@ export default function AdminEditor() {
   const { id = "" } = useParams();
   const [sp] = useSearchParams();
   const token = sp.get("token") ?? "";
+
+  // true only when we just arrived here from a fresh upload — lets the step
+  // bar animate the 1→2 fill once (a plain visit from the list does not)
+  const location = useLocation();
+  const justUploaded = useRef(
+    !!(location.state as { justUploaded?: boolean } | null)?.justUploaded,
+  );
+  useEffect(() => {
+    if (justUploaded.current) window.history.replaceState(null, "");
+  }, []);
 
   const [doc, setDoc] = useState<AdminDocView | null>(null);
   const [fields, setFields] = useState<SignatureField[]>([]);
@@ -323,6 +338,12 @@ export default function AdminEditor() {
 
   const headerMeta = `${formatDateTime(doc.created_at)} 등록`;
 
+  const stepNum: 2 | 3 | 4 = !published
+    ? 2
+    : (status ?? doc).complete
+      ? 4
+      : 3;
+
   // collected signatures, keyed by field id, for the readonly preview
   const collectedSigs: Record<string, string> = {};
   if (published) {
@@ -333,7 +354,7 @@ export default function AdminEditor() {
   return (
     <div className={`app${published ? "" : " has-toolbar"}`}>
       <BackToDocs />
-      {!published && <AdminSteps current={2} />}
+      <DocSteps current={stepNum} animateInitial={justUploaded.current} />
       <DocHeader filename={doc.filename} meta={headerMeta} />
 
       {error && <div className="error">{error}</div>}

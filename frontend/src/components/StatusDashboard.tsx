@@ -28,14 +28,6 @@ export default function StatusDashboard({
       <div className="progress">
         <div className="progress-bar" style={{ width: `${pct}%` }} />
       </div>
-      {complete && (
-        <div className="status-done">
-          <CheckIcon />
-          <span>
-            <b>전원 서명 완료</b> · 최종 PDF를 저장하세요. 🎉
-          </span>
-        </div>
-      )}
       <ul className="person-list">
         {persons.map((p) => (
           <li key={p.name} className={p.done ? "done" : ""}>
