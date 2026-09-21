@@ -140,6 +140,8 @@ SIGNBOLT_ADMIN_USER=admin SIGNBOLT_ADMIN_PASSWORD='강한-비밀번호로-변경
 ```
 
 두 환경변수는 필수다 (미설정 시 서버가 시작되지 않는다 — 기본 비밀번호로 배포되는 것을 막기 위함).
+로컬 개발(Vite `:5173`) 외의 도메인에서 API를 호출해야 하면
+`SIGNBOLT_CORS_ORIGINS="https://a.example.com,https://b.example.com"` 를 추가로 설정한다.
 
 ### 프론트엔드
 

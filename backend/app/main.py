@@ -44,9 +44,19 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="SignBolt API", lifespan=lifespan)
+
+# 운영 환경은 프론트엔드를 같은 오리진에서 같이 서빙하므로 CORS가 필요 없다.
+# 로컬 개발(Vite :5173 → API :8000)만 기본 허용하고, 그 외 도메인이 필요하면
+# SIGNBOLT_CORS_ORIGINS="https://a.example.com,https://b.example.com" 로 지정한다.
+_DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+_EXTRA_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("SIGNBOLT_CORS_ORIGINS", "").split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_DEV_ORIGINS + _EXTRA_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
