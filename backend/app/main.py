@@ -5,6 +5,7 @@ import os
 import time
 from contextlib import asynccontextmanager
 from typing import List, Optional
+from urllib.parse import quote
 
 import fitz
 from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
@@ -120,15 +121,18 @@ def admin_documents(
 
 # ---------------------------------------------------------------- helpers ---
 
-def _page_infos(doc_id: str, pdf_path, url_prefix: str) -> List[PageInfo]:
+def _page_infos(
+    doc_id: str, pdf_path, url_prefix: str, token: Optional[str] = None
+) -> List[PageInfo]:
     doc = fitz.open(pdf_path)
+    suffix = f"?token={quote(token)}" if token else ""
     try:
         return [
             PageInfo(
                 index=i,
                 width=p.rect.width,
                 height=p.rect.height,
-                image_url=f"{url_prefix}/{i}.png",
+                image_url=f"{url_prefix}/{i}.png{suffix}",
             )
             for i, p in enumerate(doc)
         ]
@@ -161,7 +165,7 @@ def _render_page(pdf_path, page_index: int) -> Response:
     finally:
         doc.close()
     return Response(content=png, media_type="image/png",
-                    headers={"Cache-Control": "public, max-age=3600"})
+                    headers={"Cache-Control": "private, no-store"})
 
 
 def _clamp_bbox(bbox: List[float], pr) -> List[float]:
@@ -204,7 +208,7 @@ async def upload_document(
         filename=row["filename"],
         status=row["status"],
         pages=_page_infos(doc_id, store.source_pdf(doc_id),
-                          f"/api/documents/{doc_id}/pages"),
+                          f"/api/documents/{doc_id}/pages", row["admin_token"]),
         fields=workflow.fields_for_admin(doc_id),
     )
 
@@ -219,7 +223,7 @@ def get_document(doc_id: str, token: Optional[str] = Query(None)) -> AdminDocVie
         status=row["status"],
         created_at=row["created_at"],
         pages=_page_infos(doc_id, store.source_pdf(doc_id),
-                          f"/api/documents/{doc_id}/pages"),
+                          f"/api/documents/{doc_id}/pages", row["admin_token"]),
         fields=workflow.fields_for_admin(doc_id),
         sign_url=sign_url,
         qr_svg=qr.make_qr_svg(sign_url) if sign_url else None,
@@ -317,7 +321,6 @@ def download_final(doc_id: str, token: Optional[str] = Query(None)) -> Response:
     row = _require_admin(doc_id, token)
     data = workflow.rebuild_final_pdf(doc_id)
     stem = (row["filename"].rsplit(".", 1)[0] or "document")
-    from urllib.parse import quote
 
     return Response(
         content=data,
@@ -332,9 +335,10 @@ def download_final(doc_id: str, token: Optional[str] = Query(None)) -> Response:
 
 
 @app.get("/api/documents/{doc_id}/pages/{page_index}.png")
-def admin_page_image(doc_id: str, page_index: int) -> Response:
-    if db.get_document(doc_id) is None:
-        raise HTTPException(404, "문서를 찾을 수 없습니다.")
+def admin_page_image(
+    doc_id: str, page_index: int, token: Optional[str] = Query(None)
+) -> Response:
+    _require_admin(doc_id, token)
     return _render_page(store.source_pdf(doc_id), page_index)
 
 
