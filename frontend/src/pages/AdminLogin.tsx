@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import Logo from "../components/Logo";
-import { adminLogin } from "../api";
-import { getAdminCred, setAdminCred } from "../lib/adminAuth";
+import { adminLogin, checkAdminSession } from "../api";
 
 export default function AdminLogin() {
   const nav = useNavigate();
@@ -10,8 +9,19 @@ export default function AdminLogin() {
   const [pw, setPw] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [alreadyIn, setAlreadyIn] = useState(false);
 
-  if (getAdminCred()) return <Navigate to="/admin/docs" replace />;
+  useEffect(() => {
+    let alive = true;
+    checkAdminSession().then((ok) => {
+      if (alive && ok) setAlreadyIn(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  if (alreadyIn) return <Navigate to="/admin/docs" replace />;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,7 +29,6 @@ export default function AdminLogin() {
     setError(null);
     try {
       await adminLogin(user, pw);
-      setAdminCred({ user, pw });
       nav("/admin/docs", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

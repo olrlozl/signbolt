@@ -19,7 +19,6 @@ export interface SignatureField {
 
 export interface UploadResponse {
   id: string;
-  admin_token: string;
   filename: string;
   status: DocStatus;
   pages: PageInfo[];
@@ -58,7 +57,6 @@ export interface StatusView {
 
 export interface AdminDocSummary {
   id: string;
-  admin_token: string;
   filename: string;
   status: DocStatus;
   created_at: number;

@@ -42,6 +42,11 @@ CREATE TABLE IF NOT EXISTS signatures (
     signed_at   REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sig_doc ON signatures(document_id);
+CREATE TABLE IF NOT EXISTS sessions (
+    id         TEXT PRIMARY KEY,
+    created_at REAL NOT NULL,
+    expires_at REAL NOT NULL
+);
 """
 
 
@@ -109,14 +114,6 @@ def get_document(doc_id: str) -> Optional[sqlite3.Row]:
     with connection() as conn:
         return conn.execute(
             "SELECT * FROM documents WHERE id = ?", (doc_id,)
-        ).fetchone()
-
-
-def get_by_admin_token(doc_id: str, token: str) -> Optional[sqlite3.Row]:
-    with connection() as conn:
-        return conn.execute(
-            "SELECT * FROM documents WHERE id = ? AND admin_token = ?",
-            (doc_id, token),
         ).fetchone()
 
 
@@ -217,3 +214,39 @@ def list_signatures(doc_id: str) -> List[sqlite3.Row]:
 
 def signed_field_ids(doc_id: str) -> set:
     return {r["field_id"] for r in list_signatures(doc_id)}
+
+
+# --------------------------------------------------------------- sessions ---
+
+SESSION_TTL_SECONDS = 60 * 60 * 24 * 7  # 7일
+
+
+def create_session() -> str:
+    session_id = secrets.token_urlsafe(32)
+    now = time.time()
+    with writing() as conn:
+        conn.execute(
+            "INSERT INTO sessions (id, created_at, expires_at) VALUES (?, ?, ?)",
+            (session_id, now, now + SESSION_TTL_SECONDS),
+        )
+    return session_id
+
+
+def get_session(session_id: str) -> Optional[sqlite3.Row]:
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM sessions WHERE id = ?", (session_id,)
+        ).fetchone()
+    if row is None or row["expires_at"] < time.time():
+        return None
+    return row
+
+
+def delete_session(session_id: str) -> None:
+    with writing() as conn:
+        conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+
+
+def gc_expired_sessions() -> None:
+    with writing() as conn:
+        conn.execute("DELETE FROM sessions WHERE expires_at < ?", (time.time(),))

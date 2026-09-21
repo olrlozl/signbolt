@@ -24,13 +24,6 @@ async function j<T>(res: Response): Promise<T> {
 
 // ---- admin: login + document list ----
 
-import type { AdminCred } from "./lib/adminAuth";
-
-const credHeaders = (c: AdminCred) => ({
-  "X-Admin-User": c.user,
-  "X-Admin-Password": c.pw,
-});
-
 export async function adminLogin(
   username: string,
   password: string,
@@ -38,111 +31,99 @@ export async function adminLogin(
   await j(
     await fetch("/api/admin/login", {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     }),
   );
 }
 
-export async function listAdminDocs(
-  cred: AdminCred,
-): Promise<AdminDocSummary[]> {
+export async function adminLogout(): Promise<void> {
+  await fetch("/api/admin/logout", {
+    method: "POST",
+    credentials: "include",
+  });
+}
+
+export async function checkAdminSession(): Promise<boolean> {
+  const res = await fetch("/api/admin/session", { credentials: "include" });
+  return res.ok;
+}
+
+export async function listAdminDocs(): Promise<AdminDocSummary[]> {
   return j(
-    await fetch("/api/admin/documents", { headers: credHeaders(cred) }),
+    await fetch("/api/admin/documents", { credentials: "include" }),
   );
 }
 
-export async function deleteAdminDoc(
-  id: string,
-  cred: AdminCred,
-): Promise<void> {
+export async function deleteAdminDoc(id: string): Promise<void> {
   await j(
     await fetch(`/api/admin/documents/${id}`, {
       method: "DELETE",
-      headers: credHeaders(cred),
+      credentials: "include",
     }),
   );
 }
 
 // ---- admin: single document ----
 
-export async function uploadPdf(
-  file: File,
-  cred: AdminCred,
-): Promise<UploadResponse> {
+export async function uploadPdf(file: File): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
   return j(
     await fetch("/api/documents", {
       method: "POST",
-      headers: credHeaders(cred),
+      credentials: "include",
       body: form,
     }),
   );
 }
 
-export async function getAdminDoc(
-  id: string,
-  token: string,
-): Promise<AdminDocView> {
+export async function getAdminDoc(id: string): Promise<AdminDocView> {
   return j(
-    await fetch(`/api/documents/${id}`, {
-      headers: { "X-Doc-Token": token },
-    }),
+    await fetch(`/api/documents/${id}`, { credentials: "include" }),
   );
 }
 
 export async function saveFields(
   id: string,
-  token: string,
   fields: FieldInputList,
 ): Promise<AdminDocView> {
   return j(
     await fetch(`/api/documents/${id}/fields`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json", "X-Doc-Token": token },
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fields }),
     }),
   );
 }
 
-export async function publishDoc(
-  id: string,
-  token: string,
-): Promise<PublishResponse> {
+export async function publishDoc(id: string): Promise<PublishResponse> {
   return j(
     await fetch(`/api/documents/${id}/publish`, {
       method: "POST",
-      headers: { "X-Doc-Token": token },
+      credentials: "include",
     }),
   );
 }
 
-export async function getStatus(
-  id: string,
-  token: string,
-): Promise<StatusView> {
+export async function getStatus(id: string): Promise<StatusView> {
   return j(
-    await fetch(`/api/documents/${id}/status`, {
-      headers: { "X-Doc-Token": token },
-    }),
+    await fetch(`/api/documents/${id}/status`, { credentials: "include" }),
   );
 }
 
-export function finalPdfUrl(id: string, token: string): string {
-  return `/api/documents/${id}/final.pdf?token=${encodeURIComponent(token)}`;
+export function finalPdfUrl(id: string): string {
+  return `/api/documents/${id}/final.pdf`;
 }
 
-export function qrPngUrl(id: string, token: string): string {
-  return `/api/documents/${id}/qr.png?token=${encodeURIComponent(token)}`;
+export function qrPngUrl(id: string): string {
+  return `/api/documents/${id}/qr.png`;
 }
 
-export function signaturePngUrl(
-  id: string,
-  token: string,
-  fieldId: string,
-): string {
-  return `/api/documents/${id}/signatures/${encodeURIComponent(fieldId)}.png?token=${encodeURIComponent(token)}`;
+export function signaturePngUrl(id: string, fieldId: string): string {
+  return `/api/documents/${id}/signatures/${encodeURIComponent(fieldId)}.png`;
 }
 
 // ---- signer ----

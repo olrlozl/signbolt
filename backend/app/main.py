@@ -8,7 +8,7 @@ from typing import List, Optional
 from urllib.parse import quote
 
 import fitz
-from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
@@ -40,6 +40,10 @@ async def lifespan(_app: FastAPI):
         store.gc(db.all_document_ids())
     except Exception:
         pass
+    try:
+        db.gc_expired_sessions()
+    except Exception:
+        pass
     yield
 
 
@@ -57,9 +61,21 @@ _EXTRA_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_DEV_ORIGINS + _EXTRA_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+SESSION_COOKIE = "signbolt_session"
+
+
+def _cookie_secure() -> bool:
+    origin = (
+        os.environ.get("SIGNBOLT_PUBLIC_ORIGIN")
+        or os.environ.get("RENDER_EXTERNAL_URL")
+        or ""
+    )
+    return origin.startswith("https://")
 
 db.init_db()
 
@@ -99,18 +115,39 @@ def _check_admin(user: Optional[str], pw: Optional[str]) -> None:
 
 
 @app.post("/api/admin/login")
-def admin_login(body: AdminLogin) -> dict:
+def admin_login(body: AdminLogin, response: Response) -> dict:
     _check_admin(body.username, body.password)
+    session_id = db.create_session()
+    response.set_cookie(
+        SESSION_COOKIE,
+        session_id,
+        httponly=True,
+        samesite="lax",
+        secure=_cookie_secure(),
+        max_age=db.SESSION_TTL_SECONDS,
+        path="/",
+    )
+    return {"ok": True}
+
+
+@app.post("/api/admin/logout")
+def admin_logout(request: Request, response: Response) -> dict:
+    session_id = request.cookies.get(SESSION_COOKIE)
+    if session_id:
+        db.delete_session(session_id)
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return {"ok": True}
+
+
+@app.get("/api/admin/session")
+def admin_session(request: Request) -> dict:
+    _require_session(request)
     return {"ok": True}
 
 
 @app.delete("/api/admin/documents/{doc_id}")
-def admin_delete_document(
-    doc_id: str,
-    x_admin_user: Optional[str] = Header(None),
-    x_admin_password: Optional[str] = Header(None),
-) -> dict:
-    _check_admin(x_admin_user, x_admin_password)
+def admin_delete_document(doc_id: str, request: Request) -> dict:
+    _require_session(request)
     if db.get_document(doc_id) is None:
         raise HTTPException(404, "문서를 찾을 수 없습니다.")
     db.delete_document(doc_id)
@@ -119,18 +156,14 @@ def admin_delete_document(
 
 
 @app.get("/api/admin/documents", response_model=List[AdminDocSummary])
-def admin_documents(
-    x_admin_user: Optional[str] = Header(None),
-    x_admin_password: Optional[str] = Header(None),
-) -> List[AdminDocSummary]:
-    _check_admin(x_admin_user, x_admin_password)
+def admin_documents(request: Request) -> List[AdminDocSummary]:
+    _require_session(request)
     out: List[AdminDocSummary] = []
     for row in db.list_documents():
         people = workflow.person_statuses(row["id"])
         out.append(
             AdminDocSummary(
                 id=row["id"],
-                admin_token=row["admin_token"],
                 filename=row["filename"],
                 status=row["status"],
                 created_at=row["created_at"],
@@ -145,18 +178,15 @@ def admin_documents(
 
 # ---------------------------------------------------------------- helpers ---
 
-def _page_infos(
-    doc_id: str, pdf_path, url_prefix: str, token: Optional[str] = None
-) -> List[PageInfo]:
+def _page_infos(doc_id: str, pdf_path, url_prefix: str) -> List[PageInfo]:
     doc = fitz.open(pdf_path)
-    suffix = f"?token={quote(token)}" if token else ""
     try:
         return [
             PageInfo(
                 index=i,
                 width=p.rect.width,
                 height=p.rect.height,
-                image_url=f"{url_prefix}/{i}.png{suffix}",
+                image_url=f"{url_prefix}/{i}.png",
             )
             for i, p in enumerate(doc)
         ]
@@ -164,12 +194,17 @@ def _page_infos(
         doc.close()
 
 
-def _require_admin(doc_id: str, token: Optional[str]):
-    if not token:
-        raise HTTPException(401, "관리 토큰이 필요합니다.")
-    row = db.get_by_admin_token(doc_id, token)
+def _require_session(request: Request) -> None:
+    session_id = request.cookies.get(SESSION_COOKIE)
+    if not session_id or db.get_session(session_id) is None:
+        raise HTTPException(401, "로그인이 필요합니다.")
+
+
+def _require_admin(doc_id: str, request: Request):
+    _require_session(request)
+    row = db.get_document(doc_id)
     if row is None:
-        raise HTTPException(404, "문서를 찾을 수 없거나 권한이 없습니다.")
+        raise HTTPException(404, "문서를 찾을 수 없습니다.")
     return row
 
 
@@ -203,11 +238,10 @@ def _clamp_bbox(bbox: List[float], pr) -> List[float]:
 
 @app.post("/api/documents", response_model=UploadResponse)
 async def upload_document(
+    request: Request,
     file: UploadFile = File(...),
-    x_admin_user: Optional[str] = Header(None),
-    x_admin_password: Optional[str] = Header(None),
 ) -> UploadResponse:
-    _check_admin(x_admin_user, x_admin_password)
+    _require_session(request)
     if not (file.filename or "").lower().endswith(".pdf"):
         raise HTTPException(400, "PDF 파일만 업로드할 수 있습니다.")
     pdf_bytes = await file.read()
@@ -228,22 +262,17 @@ async def upload_document(
 
     return UploadResponse(
         id=doc_id,
-        admin_token=row["admin_token"],
         filename=row["filename"],
         status=row["status"],
         pages=_page_infos(doc_id, store.source_pdf(doc_id),
-                          f"/api/documents/{doc_id}/pages", row["admin_token"]),
+                          f"/api/documents/{doc_id}/pages"),
         fields=workflow.fields_for_admin(doc_id),
     )
 
 
 @app.get("/api/documents/{doc_id}", response_model=AdminDocView)
-def get_document(
-    doc_id: str,
-    token: Optional[str] = Query(None),
-    x_doc_token: Optional[str] = Header(None, alias="X-Doc-Token"),
-) -> AdminDocView:
-    row = _require_admin(doc_id, x_doc_token or token)
+def get_document(doc_id: str, request: Request) -> AdminDocView:
+    row = _require_admin(doc_id, request)
     sign_url = qr.sign_url(row["sign_token"]) if row["sign_token"] else None
     return AdminDocView(
         id=doc_id,
@@ -251,7 +280,7 @@ def get_document(
         status=row["status"],
         created_at=row["created_at"],
         pages=_page_infos(doc_id, store.source_pdf(doc_id),
-                          f"/api/documents/{doc_id}/pages", row["admin_token"]),
+                          f"/api/documents/{doc_id}/pages"),
         fields=workflow.fields_for_admin(doc_id),
         sign_url=sign_url,
         qr_svg=qr.make_qr_svg(sign_url) if sign_url else None,
@@ -262,10 +291,8 @@ def get_document(
 
 
 @app.get("/api/documents/{doc_id}/signatures/{field_id}.png")
-def admin_signature_image(
-    doc_id: str, field_id: str, token: Optional[str] = Query(None)
-) -> Response:
-    _require_admin(doc_id, token)
+def admin_signature_image(doc_id: str, field_id: str, request: Request) -> Response:
+    _require_admin(doc_id, request)
     try:
         path = store.signature_png(doc_id, field_id)
     except ValueError:
@@ -277,13 +304,8 @@ def admin_signature_image(
 
 
 @app.put("/api/documents/{doc_id}/fields", response_model=AdminDocView)
-def update_fields(
-    doc_id: str,
-    body: FieldsUpdate,
-    token: Optional[str] = Query(None),
-    x_doc_token: Optional[str] = Header(None, alias="X-Doc-Token"),
-) -> AdminDocView:
-    row = _require_admin(doc_id, x_doc_token or token)
+def update_fields(doc_id: str, body: FieldsUpdate, request: Request) -> AdminDocView:
+    row = _require_admin(doc_id, request)
     if row["status"] != "draft":
         raise HTTPException(409, "이미 게시된 문서는 서명란을 수정할 수 없습니다.")
 
@@ -308,16 +330,12 @@ def update_fields(
             }
         )
     db.replace_fields(doc_id, cleaned)
-    return get_document(doc_id, token, x_doc_token)
+    return get_document(doc_id, request)
 
 
 @app.post("/api/documents/{doc_id}/publish", response_model=PublishResponse)
-def publish_document(
-    doc_id: str,
-    token: Optional[str] = Query(None),
-    x_doc_token: Optional[str] = Header(None, alias="X-Doc-Token"),
-) -> PublishResponse:
-    row = _require_admin(doc_id, x_doc_token or token)
+def publish_document(doc_id: str, request: Request) -> PublishResponse:
+    row = _require_admin(doc_id, request)
     if row["status"] != "draft":
         return PublishResponse(
             status=row["status"],
@@ -337,12 +355,8 @@ def publish_document(
 
 
 @app.get("/api/documents/{doc_id}/status", response_model=StatusView)
-def document_status(
-    doc_id: str,
-    token: Optional[str] = Query(None),
-    x_doc_token: Optional[str] = Header(None, alias="X-Doc-Token"),
-) -> StatusView:
-    row = _require_admin(doc_id, x_doc_token or token)
+def document_status(doc_id: str, request: Request) -> StatusView:
+    row = _require_admin(doc_id, request)
     return StatusView(
         status=row["status"],
         persons=workflow.person_statuses(doc_id),
@@ -352,8 +366,8 @@ def document_status(
 
 
 @app.get("/api/documents/{doc_id}/final.pdf")
-def download_final(doc_id: str, token: Optional[str] = Query(None)) -> Response:
-    row = _require_admin(doc_id, token)
+def download_final(doc_id: str, request: Request) -> Response:
+    row = _require_admin(doc_id, request)
     data = workflow.rebuild_final_pdf(doc_id)
     stem = (row["filename"].rsplit(".", 1)[0] or "document")
 
@@ -370,16 +384,14 @@ def download_final(doc_id: str, token: Optional[str] = Query(None)) -> Response:
 
 
 @app.get("/api/documents/{doc_id}/pages/{page_index}.png")
-def admin_page_image(
-    doc_id: str, page_index: int, token: Optional[str] = Query(None)
-) -> Response:
-    _require_admin(doc_id, token)
+def admin_page_image(doc_id: str, page_index: int, request: Request) -> Response:
+    _require_admin(doc_id, request)
     return _render_page(store.source_pdf(doc_id), page_index)
 
 
 @app.get("/api/documents/{doc_id}/qr.png")
-def qr_png(doc_id: str, token: Optional[str] = Query(None)) -> Response:
-    row = _require_admin(doc_id, token)
+def qr_png(doc_id: str, request: Request) -> Response:
+    row = _require_admin(doc_id, request)
     if not row["sign_token"]:
         raise HTTPException(409, "아직 게시되지 않았습니다.")
     png = qr.make_qr_png(qr.sign_url(row["sign_token"]))
@@ -494,7 +506,6 @@ def signer_submit(sign_token: str, body: SubmitRequest) -> SubmitResponse:
 # --------------------------------------------------------------------------- #
 from pathlib import Path as _Path  # noqa: E402
 
-from fastapi import Request  # noqa: E402
 from fastapi.responses import FileResponse, HTMLResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 

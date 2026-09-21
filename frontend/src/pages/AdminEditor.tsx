@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  useBlocker,
-  useLocation,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
+import { useBlocker, useLocation, useParams } from "react-router-dom";
 import PageView, {
   type PageViewField,
   type PageViewHandle,
@@ -52,8 +47,6 @@ const serialize = (fs: SignatureField[]) => JSON.stringify(payloadOf(fs));
 
 export default function AdminEditor() {
   const { id = "" } = useParams();
-  const [sp] = useSearchParams();
-  const token = sp.get("token") ?? "";
 
   // true only when we just arrived here from a fresh upload — lets the step
   // bar animate the 1→2 fill once (a plain visit from the list does not)
@@ -87,7 +80,7 @@ export default function AdminEditor() {
 
   const load = useCallback(async () => {
     try {
-      const d = await getAdminDoc(id, token);
+      const d = await getAdminDoc(id);
       setDoc(d);
       const fs = d.fields.map((f) => ({ ...f }));
       setFields(fs);
@@ -95,7 +88,7 @@ export default function AdminEditor() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, [id, token]);
+  }, [id]);
 
   useEffect(() => {
     load();
@@ -161,7 +154,7 @@ export default function AdminEditor() {
     let alive = true;
     const tick = async () => {
       try {
-        const s = await getStatus(id, token);
+        const s = await getStatus(id);
         if (alive) setStatus(s);
       } catch {
         /* ignore */
@@ -173,7 +166,7 @@ export default function AdminEditor() {
       alive = false;
       clearInterval(h);
     };
-  }, [published, id, token]);
+  }, [published, id]);
 
   const nameOptions = useMemo(() => {
     const set = new Set<string>();
@@ -279,7 +272,7 @@ export default function AdminEditor() {
     setSaving(true);
     setError(null);
     try {
-      const d = await saveFields(id, token, payload);
+      const d = await saveFields(id, payload);
       savedRef.current = snap;
       if (aliveRef.current) setDoc(d);
       return true;
@@ -305,7 +298,7 @@ export default function AdminEditor() {
     if (dirty && !(await save())) return;
     setBusy(true);
     try {
-      await publishDoc(id, token);
+      await publishDoc(id);
       await load();
       window.scrollTo({ top: 0, behavior: "auto" });
     } catch (e) {
@@ -348,7 +341,7 @@ export default function AdminEditor() {
   const collectedSigs: Record<string, string> = {};
   if (published) {
     for (const fid of (status ?? doc).signed_field_ids ?? [])
-      collectedSigs[fid] = signaturePngUrl(id, token, fid);
+      collectedSigs[fid] = signaturePngUrl(id, fid);
   }
 
   return (
@@ -411,13 +404,13 @@ export default function AdminEditor() {
         <div className="publish-grid">
           <QrPanel
             signUrl={doc.sign_url}
-            qrPngUrl={qrPngUrl(id, token)}
+            qrPngUrl={qrPngUrl(id)}
             docName={doc.filename}
           />
           <StatusDashboard
             persons={(status ?? doc).persons}
             complete={(status ?? doc).complete}
-            finalUrl={finalPdfUrl(id, token)}
+            finalUrl={finalPdfUrl(id)}
           />
         </div>
       )}

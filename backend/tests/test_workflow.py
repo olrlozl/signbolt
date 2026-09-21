@@ -17,7 +17,6 @@ pytestmark = pytest.mark.skipif(not FIXTURE.exists(), reason="no sample PDF")
 
 ADMIN_USER = "test-admin"
 ADMIN_PW = "test-pw"
-ADMIN_HEADERS = {"X-Admin-User": ADMIN_USER, "X-Admin-Password": ADMIN_PW}
 
 
 @pytest.fixture()
@@ -53,11 +52,18 @@ def _sig() -> str:
     return "data:image/png;base64," + base64.b64encode(b.getvalue()).decode()
 
 
+def _login(client) -> None:
+    r = client.post(
+        "/api/admin/login", json={"username": ADMIN_USER, "password": ADMIN_PW}
+    )
+    assert r.status_code == 200
+
+
 def _upload(client) -> dict:
+    _login(client)
     return client.post(
         "/api/documents",
         files={"file": ("s.pdf", FIXTURE.read_bytes(), "application/pdf")},
-        headers=ADMIN_HEADERS,
     ).json()
 
 
@@ -65,16 +71,21 @@ def test_upload_requires_admin_credentials(client):
     files = {"file": ("s.pdf", FIXTURE.read_bytes(), "application/pdf")}
     assert client.post("/api/documents", files=files).status_code == 401
     assert client.post(
-        "/api/documents", files=files, headers={"X-Admin-Password": ADMIN_PW}
-    ).status_code == 401  # missing user
-    assert client.post(
         "/api/admin/login", json={"username": ADMIN_USER, "password": "bad"}
     ).status_code == 401
     assert client.post(
         "/api/admin/login", json={"username": ADMIN_USER, "password": ADMIN_PW}
     ).status_code == 200
-    r = client.get("/api/admin/documents", headers=ADMIN_HEADERS)
+    r = client.get("/api/admin/documents")
     assert r.status_code == 200 and r.json() == []
+
+
+def test_login_logout_session(client):
+    assert client.get("/api/admin/session").status_code == 401
+    _login(client)
+    assert client.get("/api/admin/session").status_code == 200
+    assert client.post("/api/admin/logout").status_code == 200
+    assert client.get("/api/admin/session").status_code == 401
 
 
 def test_upload_detects_and_names(client):
@@ -89,21 +100,19 @@ def test_upload_detects_and_names(client):
 def test_delete_document(client):
     u = _upload(client)
     did = u["id"]
-    client.post(f"/api/documents/{did}/publish?token={u['admin_token']}")
+    client.post(f"/api/documents/{did}/publish")
     # signer signs one field so there's a signature + final.pdf on disk
-    stok = client.get(f"/api/documents/{did}/status?token={u['admin_token']}")
+    stok = client.get(f"/api/documents/{did}/status")
     assert stok.status_code == 200
 
+    client.cookies.clear()
     assert client.delete(f"/api/admin/documents/{did}").status_code == 401
-    r = client.delete(f"/api/admin/documents/{did}", headers=ADMIN_HEADERS)
+    _login(client)
+    r = client.delete(f"/api/admin/documents/{did}")
     assert r.status_code == 200
-    assert client.get(
-        f"/api/documents/{did}?token={u['admin_token']}"
-    ).status_code == 404
-    assert client.delete(
-        f"/api/admin/documents/{did}", headers=ADMIN_HEADERS
-    ).status_code == 404
-    assert client.get("/api/admin/documents", headers=ADMIN_HEADERS).json() == []
+    assert client.get(f"/api/documents/{did}").status_code == 404
+    assert client.delete(f"/api/admin/documents/{did}").status_code == 404
+    assert client.get("/api/admin/documents").json() == []
 
 
 def test_multiple_documents_do_not_collide(client):
@@ -112,31 +121,31 @@ def test_multiple_documents_do_not_collide(client):
     b = _upload(client)
     assert a["id"] != b["id"]
     for d in (a, b):
-        r = client.post(
-            f"/api/documents/{d['id']}/publish?token={d['admin_token']}"
-        )
+        r = client.post(f"/api/documents/{d['id']}/publish")
         assert r.status_code == 200
 
 
 def test_publish_requires_names(client):
     u = _upload(client)
-    did, tok = u["id"], u["admin_token"]
+    did = u["id"]
     blanked = [{**f, "signer_name": ""} for f in u["fields"]]
-    client.put(f"/api/documents/{did}/fields?token={tok}", json={"fields": blanked})
-    r = client.post(f"/api/documents/{did}/publish?token={tok}")
+    client.put(f"/api/documents/{did}/fields", json={"fields": blanked})
+    r = client.post(f"/api/documents/{did}/publish")
     assert r.status_code == 400
 
 
-def test_admin_token_required(client):
+def test_admin_session_required(client):
     u = _upload(client)
+    client.cookies.clear()
     assert client.get(f"/api/documents/{u['id']}").status_code == 401
-    assert client.get(f"/api/documents/{u['id']}?token=wrong").status_code == 404
+    client.cookies.set("signbolt_session", "wrong")
+    assert client.get(f"/api/documents/{u['id']}").status_code == 401
 
 
 def test_full_flow_and_double_sign_rejected(client):
     u = _upload(client)
-    did, tok = u["id"], u["admin_token"]
-    st = client.post(f"/api/documents/{did}/publish?token={tok}").json()
+    did = u["id"]
+    st = client.post(f"/api/documents/{did}/publish").json()
     stok = st["sign_url"].rsplit("/", 1)[1]
 
     view = client.get(f"/api/sign/{stok}").json()
@@ -177,18 +186,18 @@ def test_full_flow_and_double_sign_rejected(client):
         )
         assert rr.status_code == 200
 
-    status = client.get(f"/api/documents/{did}/status?token={tok}").json()
+    status = client.get(f"/api/documents/{did}/status").json()
     assert status["status"] == "completed" and status["complete"] is True
 
-    final = client.get(f"/api/documents/{did}/final.pdf?token={tok}")
+    final = client.get(f"/api/documents/{did}/final.pdf")
     doc = fitz.open(stream=final.content, filetype="pdf")
     assert len(doc[0].get_images()) == 7
 
 
 def test_concurrent_submissions(client):
     u = _upload(client)
-    did, tok = u["id"], u["admin_token"]
-    st = client.post(f"/api/documents/{did}/publish?token={tok}").json()
+    did = u["id"]
+    st = client.post(f"/api/documents/{did}/publish").json()
     stok = st["sign_url"].rsplit("/", 1)[1]
     view = client.get(f"/api/sign/{stok}").json()
 
@@ -210,5 +219,5 @@ def test_concurrent_submissions(client):
         t.join()
 
     assert set(results.values()) == {200}
-    status = client.get(f"/api/documents/{did}/status?token={tok}").json()
+    status = client.get(f"/api/documents/{did}/status").json()
     assert status["complete"] is True

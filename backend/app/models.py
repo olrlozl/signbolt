@@ -30,7 +30,6 @@ class SignatureField(BaseModel):
 
 class UploadResponse(BaseModel):
     id: str
-    admin_token: str
     filename: str
     status: str
     pages: List[PageInfo]
@@ -84,7 +83,6 @@ class AdminLogin(BaseModel):
 
 class AdminDocSummary(BaseModel):
     id: str
-    admin_token: str
     filename: str
     status: str
     created_at: float

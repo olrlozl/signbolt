@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { deleteAdminDoc, listAdminDocs } from "../api";
+import { adminLogout, deleteAdminDoc, listAdminDocs } from "../api";
 import { InboxIcon, TrashIcon } from "../components/icons";
 import ConfirmModal from "../components/ConfirmModal";
 import Toast from "../components/Toast";
-import { clearAdminCred, getAdminCred } from "../lib/adminAuth";
 import { takeFlash } from "../lib/flash";
 import { STATUS_LABEL, formatDateTime } from "../lib/format";
 import type { AdminDocSummary } from "../types";
@@ -30,7 +29,6 @@ export default function AdminDocList() {
       msg.includes("비밀번호") ||
       msg.includes("401")
     ) {
-      clearAdminCred();
       nav("/admin", { replace: true });
       return true;
     }
@@ -39,23 +37,17 @@ export default function AdminDocList() {
   }
 
   useEffect(() => {
-    const cred = getAdminCred();
-    if (!cred) {
-      nav("/admin", { replace: true });
-      return;
-    }
-    listAdminDocs(cred).then(setDocs).catch(bail);
+    listAdminDocs().then(setDocs).catch(bail);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nav]);
 
   async function confirmDelete() {
-    const cred = getAdminCred();
-    if (!cred || !pending) return;
+    if (!pending) return;
     const id = pending.id;
     setDeleting(true);
     setError(null);
     try {
-      await deleteAdminDoc(id, cred);
+      await deleteAdminDoc(id);
       setDocs((prev) => (prev ? prev.filter((x) => x.id !== id) : prev));
       setPending(null);
     } catch (e) {
@@ -79,8 +71,8 @@ export default function AdminDocList() {
           </Link>
           <button
             className="btn ghost"
-            onClick={() => {
-              clearAdminCred();
+            onClick={async () => {
+              await adminLogout();
               nav("/admin", { replace: true });
             }}
           >
@@ -113,10 +105,7 @@ export default function AdminDocList() {
           </div>
           {docs.map((d) => (
             <div key={d.id} className="doc-row">
-              <Link
-                className="doc-row-main"
-                to={`/d/${d.id}?token=${encodeURIComponent(d.admin_token)}`}
-              >
+              <Link className="doc-row-main" to={`/d/${d.id}`}>
                 <span className="doc-row-name">{d.filename}</span>
                 <span className={`doc-row-badge s-${d.status}`}>
                   {STATUS_LABEL[d.status]}
