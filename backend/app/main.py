@@ -34,6 +34,8 @@ MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     db.init_db()
+    _admin_user()
+    _admin_password()
     try:
         store.gc(db.all_document_ids())
     except Exception:
@@ -60,11 +62,23 @@ def health() -> dict:
 # ------------------------------------------------------------ admin login ---
 
 def _admin_user() -> str:
-    return os.environ.get("SIGNBOLT_ADMIN_USER", "admin")
+    user = os.environ.get("SIGNBOLT_ADMIN_USER")
+    if not user:
+        raise RuntimeError(
+            "SIGNBOLT_ADMIN_USER 환경변수가 설정되지 않았습니다. "
+            "기본 관리자 계정을 쓰지 않도록 직접 값을 지정해야 합니다."
+        )
+    return user
 
 
 def _admin_password() -> str:
-    return os.environ.get("SIGNBOLT_ADMIN_PASSWORD", "admin1234")
+    pw = os.environ.get("SIGNBOLT_ADMIN_PASSWORD")
+    if not pw:
+        raise RuntimeError(
+            "SIGNBOLT_ADMIN_PASSWORD 환경변수가 설정되지 않았습니다. "
+            "기본 관리자 계정을 쓰지 않도록 직접 값을 지정해야 합니다."
+        )
+    return pw
 
 
 def _check_admin(user: Optional[str], pw: Optional[str]) -> None:

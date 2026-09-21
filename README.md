@@ -135,11 +135,11 @@ render.yaml      Render Blueprint (무료 티어)
 cd backend
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-SIGNBOLT_ADMIN_USER=admin SIGNBOLT_ADMIN_PASSWORD=admin1234 \
+SIGNBOLT_ADMIN_USER=admin SIGNBOLT_ADMIN_PASSWORD='강한-비밀번호로-변경' \
   .venv/bin/python -m uvicorn app.main:app --reload --port 8000
 ```
 
-미설정 시 기본값 `admin` / `admin1234`.
+두 환경변수는 필수다 (미설정 시 서버가 시작되지 않는다 — 기본 비밀번호로 배포되는 것을 막기 위함).
 
 ### 프론트엔드
 
