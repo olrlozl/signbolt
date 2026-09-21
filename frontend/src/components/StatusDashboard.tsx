@@ -47,8 +47,11 @@ export default function StatusDashboard({
               <span className="pmeta">
                 {log && (
                   <span className="paudit">
-                    <ClockIcon />
-                    {formatDateTime(log.created_at)}
+                    <span className="paudit-time">
+                      <ClockIcon />
+                      {formatDateTime(log.created_at)}
+                    </span>
+                    <i className="paudit-break" />
                     <span className="paudit-ip">
                       {log.ip || "IP 확인 불가"}
                     </span>
