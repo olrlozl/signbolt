@@ -51,15 +51,16 @@ export default function StatusDashboard({
                       <ClockIcon />
                       {formatDateTime(log.created_at)}
                     </span>
-                    <i className="paudit-break" />
-                    <span className="paudit-ip">
-                      {log.ip || "IP 확인 불가"}
-                    </span>
-                    {summarizeUserAgent(log.user_agent) && (
-                      <span className="paudit-device">
-                        {summarizeUserAgent(log.user_agent)}
+                    <span className="paudit-info">
+                      <span className="paudit-ip">
+                        {log.ip || "IP 확인 불가"}
                       </span>
-                    )}
+                      {summarizeUserAgent(log.user_agent) && (
+                        <span className="paudit-device">
+                          {summarizeUserAgent(log.user_agent)}
+                        </span>
+                      )}
+                    </span>
                   </span>
                 )}
                 <span className="pbadge">

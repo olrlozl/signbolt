@@ -1491,8 +1491,14 @@ body {
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 3px 5px;
+  gap: 4px;
   max-width: 100%;
+}
+.person-list .paudit-time,
+.person-list .paudit-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   padding: 3px 9px;
   border-radius: 999px;
   background: var(--bg);
@@ -1501,45 +1507,16 @@ body {
   font-size: 11px;
   font-weight: 500;
   line-height: 1.4;
+  white-space: nowrap;
 }
-.person-list .paudit svg {
+.person-list .paudit-time svg {
   width: 11px;
   height: 11px;
   flex-shrink: 0;
 }
-.person-list .paudit-time {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-.person-list .paudit-break {
-  flex-basis: 0;
-  width: 0;
-  font-style: normal;
-}
-@media (max-width: 480px) {
-  .person-list .paudit-break {
-    flex-basis: 100%;
-    height: 0;
-  }
-  .person-list .paudit-ip::before {
-    content: none;
-  }
-}
 .person-list .paudit-ip {
   font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  white-space: nowrap;
   opacity: 0.85;
-}
-.person-list .paudit-ip::before {
-  content: "·";
-  margin-right: 5px;
-  opacity: 0.6;
-  font-family: inherit;
-}
-.person-list .paudit-device {
-  white-space: nowrap;
 }
 .person-list .paudit-device::before {
   content: "·";
