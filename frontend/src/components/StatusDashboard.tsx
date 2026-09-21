@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AuditLogEntry, PersonStatus } from "../types";
 import { formatDateTime } from "../lib/format";
+import { summarizeUserAgent } from "../lib/userAgent";
 import { CheckIcon, ClockIcon, DownloadIcon } from "./icons";
 
 interface Props {
@@ -43,24 +44,26 @@ export default function StatusDashboard({
           return (
             <li key={p.name} className={p.done ? "done" : ""}>
               <span className="pname">{p.name}</span>
-              {p.done ? (
-                <span className="pbadge">
-                  <CheckIcon />
-                  서명 완료
-                  {log && (
-                    <>
-                      <i className="pbadge-dot" />
-                      <ClockIcon />
-                      {formatDateTime(log.created_at)}
-                      <span className="paudit-ip">
-                        {log.ip || "IP 확인 불가"}
+              <span className="pmeta">
+                {log && (
+                  <span className="paudit">
+                    <ClockIcon />
+                    {formatDateTime(log.created_at)}
+                    <span className="paudit-ip">
+                      {log.ip || "IP 확인 불가"}
+                    </span>
+                    {summarizeUserAgent(log.user_agent) && (
+                      <span className="paudit-device">
+                        {summarizeUserAgent(log.user_agent)}
                       </span>
-                    </>
-                  )}
+                    )}
+                  </span>
+                )}
+                <span className="pbadge">
+                  {p.done && <CheckIcon />}
+                  {p.done ? "서명 완료" : "미서명"}
                 </span>
-              ) : (
-                <span className="pbadge">미서명</span>
-              )}
+              </span>
             </li>
           );
         })}
