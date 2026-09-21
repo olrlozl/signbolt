@@ -238,8 +238,12 @@ async def upload_document(
 
 
 @app.get("/api/documents/{doc_id}", response_model=AdminDocView)
-def get_document(doc_id: str, token: Optional[str] = Query(None)) -> AdminDocView:
-    row = _require_admin(doc_id, token)
+def get_document(
+    doc_id: str,
+    token: Optional[str] = Query(None),
+    x_doc_token: Optional[str] = Header(None, alias="X-Doc-Token"),
+) -> AdminDocView:
+    row = _require_admin(doc_id, x_doc_token or token)
     sign_url = qr.sign_url(row["sign_token"]) if row["sign_token"] else None
     return AdminDocView(
         id=doc_id,
@@ -274,9 +278,12 @@ def admin_signature_image(
 
 @app.put("/api/documents/{doc_id}/fields", response_model=AdminDocView)
 def update_fields(
-    doc_id: str, body: FieldsUpdate, token: Optional[str] = Query(None)
+    doc_id: str,
+    body: FieldsUpdate,
+    token: Optional[str] = Query(None),
+    x_doc_token: Optional[str] = Header(None, alias="X-Doc-Token"),
 ) -> AdminDocView:
-    row = _require_admin(doc_id, token)
+    row = _require_admin(doc_id, x_doc_token or token)
     if row["status"] != "draft":
         raise HTTPException(409, "이미 게시된 문서는 서명란을 수정할 수 없습니다.")
 
@@ -301,14 +308,16 @@ def update_fields(
             }
         )
     db.replace_fields(doc_id, cleaned)
-    return get_document(doc_id, token)
+    return get_document(doc_id, token, x_doc_token)
 
 
 @app.post("/api/documents/{doc_id}/publish", response_model=PublishResponse)
 def publish_document(
-    doc_id: str, token: Optional[str] = Query(None)
+    doc_id: str,
+    token: Optional[str] = Query(None),
+    x_doc_token: Optional[str] = Header(None, alias="X-Doc-Token"),
 ) -> PublishResponse:
-    row = _require_admin(doc_id, token)
+    row = _require_admin(doc_id, x_doc_token or token)
     if row["status"] != "draft":
         return PublishResponse(
             status=row["status"],
@@ -329,9 +338,11 @@ def publish_document(
 
 @app.get("/api/documents/{doc_id}/status", response_model=StatusView)
 def document_status(
-    doc_id: str, token: Optional[str] = Query(None)
+    doc_id: str,
+    token: Optional[str] = Query(None),
+    x_doc_token: Optional[str] = Header(None, alias="X-Doc-Token"),
 ) -> StatusView:
-    row = _require_admin(doc_id, token)
+    row = _require_admin(doc_id, x_doc_token or token)
     return StatusView(
         status=row["status"],
         persons=workflow.person_statuses(doc_id),

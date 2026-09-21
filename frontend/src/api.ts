@@ -85,7 +85,11 @@ export async function getAdminDoc(
   id: string,
   token: string,
 ): Promise<AdminDocView> {
-  return j(await fetch(`/api/documents/${id}?token=${encodeURIComponent(token)}`));
+  return j(
+    await fetch(`/api/documents/${id}`, {
+      headers: { "X-Doc-Token": token },
+    }),
+  );
 }
 
 export async function saveFields(
@@ -94,9 +98,9 @@ export async function saveFields(
   fields: FieldInputList,
 ): Promise<AdminDocView> {
   return j(
-    await fetch(`/api/documents/${id}/fields?token=${encodeURIComponent(token)}`, {
+    await fetch(`/api/documents/${id}/fields`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Doc-Token": token },
       body: JSON.stringify({ fields }),
     }),
   );
@@ -107,8 +111,9 @@ export async function publishDoc(
   token: string,
 ): Promise<PublishResponse> {
   return j(
-    await fetch(`/api/documents/${id}/publish?token=${encodeURIComponent(token)}`, {
+    await fetch(`/api/documents/${id}/publish`, {
       method: "POST",
+      headers: { "X-Doc-Token": token },
     }),
   );
 }
@@ -117,7 +122,11 @@ export async function getStatus(
   id: string,
   token: string,
 ): Promise<StatusView> {
-  return j(await fetch(`/api/documents/${id}/status?token=${encodeURIComponent(token)}`));
+  return j(
+    await fetch(`/api/documents/${id}/status`, {
+      headers: { "X-Doc-Token": token },
+    }),
+  );
 }
 
 export function finalPdfUrl(id: string, token: string): string {
