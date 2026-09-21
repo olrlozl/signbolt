@@ -16,13 +16,20 @@ import StatusDashboard from "../components/StatusDashboard";
 import {
   finalPdfUrl,
   getAdminDoc,
+  getAuditLog,
   getStatus,
   publishDoc,
   qrPngUrl,
   saveFields,
   signaturePngUrl,
 } from "../api";
-import type { AdminDocView, Bbox, SignatureField, StatusView } from "../types";
+import type {
+  AdminDocView,
+  AuditLogEntry,
+  Bbox,
+  SignatureField,
+  StatusView,
+} from "../types";
 
 type FieldPayload = {
   id: string;
@@ -64,6 +71,7 @@ export default function AdminEditor() {
   const [busy, setBusy] = useState(false); // publishing
   const [saving, setSaving] = useState(false); // auto-save in flight
   const [status, setStatus] = useState<StatusView | null>(null);
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [flashId, setFlashId] = useState<string | null>(null);
   const [customFor, setCustomFor] = useState<string | null>(null);
   const pageRefs = useRef<Record<number, PageViewHandle | null>>({});
@@ -156,6 +164,8 @@ export default function AdminEditor() {
       try {
         const s = await getStatus(id);
         if (alive) setStatus(s);
+        const log = await getAuditLog(id);
+        if (alive) setAuditLog(log);
       } catch {
         /* ignore */
       }
@@ -411,6 +421,7 @@ export default function AdminEditor() {
             persons={(status ?? doc).persons}
             complete={(status ?? doc).complete}
             finalUrl={finalPdfUrl(id)}
+            auditLog={auditLog}
           />
         </div>
       )}

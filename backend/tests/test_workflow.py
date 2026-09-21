@@ -101,6 +101,35 @@ def test_login_logout_session(client):
     assert client.get("/api/admin/session").status_code == 401
 
 
+def test_audit_log_records_events(client):
+    from app import db as db_mod
+
+    u = _upload(client)
+    did = u["id"]
+    events = [r["event"] for r in db_mod.list_audit_log(did)]
+    assert "document_upload" in events
+
+    client.post(f"/api/documents/{did}/publish")
+    doc = client.get(f"/api/documents/{did}").json()
+    sign_token = doc["sign_url"].rsplit("/", 1)[1]
+    view = client.get(f"/api/sign/{sign_token}").json()
+    name = view["fields"][0]["signer_name"]
+    fs = [f for f in view["fields"] if f["signer_name"] == name]
+    client.post(
+        f"/api/sign/{sign_token}/submit",
+        json={
+            "signer_name": name,
+            "signatures": [
+                {"field_id": f["id"], "png_data_url": _sig()} for f in fs
+            ],
+        },
+    )
+
+    events = [r["event"] for r in db_mod.list_audit_log(did)]
+    assert "document_publish" in events
+    assert "signature_submit" in events
+
+
 def test_upload_detects_and_names(client):
     u = _upload(client)
     assert u["status"] == "draft"

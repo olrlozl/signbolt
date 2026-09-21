@@ -53,6 +53,16 @@ CREATE TABLE IF NOT EXISTS login_failures (
     first_failed_at REAL NOT NULL,
     locked_until    REAL
 );
+CREATE TABLE IF NOT EXISTS audit_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    event       TEXT NOT NULL,
+    document_id TEXT,
+    detail      TEXT NOT NULL DEFAULT '',
+    ip          TEXT NOT NULL DEFAULT '',
+    user_agent  TEXT NOT NULL DEFAULT '',
+    created_at  REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_audit_doc ON audit_log(document_id);
 """
 
 
@@ -307,3 +317,34 @@ def record_login_failure(ip: str) -> None:
 def clear_login_failures(ip: str) -> None:
     with writing() as conn:
         conn.execute("DELETE FROM login_failures WHERE ip = ?", (ip,))
+
+
+# -------------------------------------------------------------- audit log ---
+
+def log_event(
+    event: str,
+    *,
+    document_id: Optional[str] = None,
+    detail: str = "",
+    ip: str = "",
+    user_agent: str = "",
+) -> None:
+    with writing() as conn:
+        conn.execute(
+            "INSERT INTO audit_log"
+            " (event, document_id, detail, ip, user_agent, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (event, document_id, detail, ip, user_agent, time.time()),
+        )
+
+
+def list_audit_log(document_id: Optional[str] = None) -> List[sqlite3.Row]:
+    with connection() as conn:
+        if document_id:
+            return conn.execute(
+                "SELECT * FROM audit_log WHERE document_id = ? ORDER BY created_at",
+                (document_id,),
+            ).fetchall()
+        return conn.execute(
+            "SELECT * FROM audit_log ORDER BY created_at"
+        ).fetchall()

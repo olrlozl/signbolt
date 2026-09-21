@@ -99,6 +99,14 @@ class StatusView(BaseModel):
     signed_field_ids: List[str] = []
 
 
+class AuditLogEntry(BaseModel):
+    event: str
+    detail: str
+    ip: str
+    user_agent: str
+    created_at: float
+
+
 # -------------------------------------------------------------- signer side ---
 
 class SignerField(BaseModel):

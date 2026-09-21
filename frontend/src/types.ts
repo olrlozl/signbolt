@@ -55,6 +55,14 @@ export interface StatusView {
   signed_field_ids: string[];
 }
 
+export interface AuditLogEntry {
+  event: string;
+  detail: string;
+  ip: string;
+  user_agent: string;
+  created_at: number;
+}
+
 export interface AdminDocSummary {
   id: string;
   filename: string;

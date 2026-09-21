@@ -1,6 +1,7 @@
 import type {
   AdminDocSummary,
   AdminDocView,
+  AuditLogEntry,
   FieldInputList,
   PublishResponse,
   SignerDocView,
@@ -111,6 +112,12 @@ export async function publishDoc(id: string): Promise<PublishResponse> {
 export async function getStatus(id: string): Promise<StatusView> {
   return j(
     await fetch(`/api/documents/${id}/status`, { credentials: "include" }),
+  );
+}
+
+export async function getAuditLog(id: string): Promise<AuditLogEntry[]> {
+  return j(
+    await fetch(`/api/documents/${id}/audit-log`, { credentials: "include" }),
   );
 }
 

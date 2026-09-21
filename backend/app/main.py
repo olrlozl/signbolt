@@ -18,6 +18,7 @@ from .models import (
     AdminDocSummary,
     AdminDocView,
     AdminLogin,
+    AuditLogEntry,
     FieldsUpdate,
     PageInfo,
     PublishResponse,
@@ -156,12 +157,15 @@ def admin_login(body: AdminLogin, request: Request, response: Response) -> dict:
         raise HTTPException(
             429, f"로그인 시도가 너무 많습니다. {minutes}분 후 다시 시도하세요."
         )
+    ua = request.headers.get("user-agent", "")
     try:
         _check_admin(body.username, body.password)
     except HTTPException:
         db.record_login_failure(ip)
+        db.log_event("admin_login_failure", detail=body.username, ip=ip, user_agent=ua)
         raise
     db.clear_login_failures(ip)
+    db.log_event("admin_login_success", detail=body.username, ip=ip, user_agent=ua)
     session_id = db.create_session()
     response.set_cookie(
         SESSION_COOKIE,
@@ -193,10 +197,18 @@ def admin_session(request: Request) -> dict:
 @app.delete("/api/admin/documents/{doc_id}")
 def admin_delete_document(doc_id: str, request: Request) -> dict:
     _require_session(request)
-    if db.get_document(doc_id) is None:
+    row = db.get_document(doc_id)
+    if row is None:
         raise HTTPException(404, "문서를 찾을 수 없습니다.")
     db.delete_document(doc_id)
     store.remove_doc_dir(doc_id)
+    db.log_event(
+        "document_delete",
+        document_id=doc_id,
+        detail=row["filename"],
+        ip=_client_ip(request),
+        user_agent=request.headers.get("user-agent", ""),
+    )
     return {"ok": True}
 
 
@@ -305,6 +317,14 @@ async def upload_document(
     detected = detect_signature_fields(pdf_bytes)
     db.replace_fields(doc_id, [f.model_dump() for f in detected])
 
+    db.log_event(
+        "document_upload",
+        document_id=doc_id,
+        detail=row["filename"],
+        ip=_client_ip(request),
+        user_agent=request.headers.get("user-agent", ""),
+    )
+
     return UploadResponse(
         id=doc_id,
         filename=row["filename"],
@@ -395,6 +415,12 @@ def publish_document(doc_id: str, request: Request) -> PublishResponse:
         raise HTTPException(400, "이름이 지정되지 않은 서명란이 있습니다.")
 
     sign_token = db.publish(doc_id)
+    db.log_event(
+        "document_publish",
+        document_id=doc_id,
+        ip=_client_ip(request),
+        user_agent=request.headers.get("user-agent", ""),
+    )
     url = qr.sign_url(sign_token)
     return PublishResponse(status="published", sign_url=url, qr_svg=qr.make_qr_svg(url))
 
@@ -408,6 +434,21 @@ def document_status(doc_id: str, request: Request) -> StatusView:
         complete=workflow.is_complete(doc_id),
         signed_field_ids=sorted(db.signed_field_ids(doc_id)),
     )
+
+
+@app.get("/api/documents/{doc_id}/audit-log", response_model=List[AuditLogEntry])
+def document_audit_log(doc_id: str, request: Request) -> List[AuditLogEntry]:
+    _require_admin(doc_id, request)
+    return [
+        AuditLogEntry(
+            event=r["event"],
+            detail=r["detail"],
+            ip=r["ip"],
+            user_agent=r["user_agent"],
+            created_at=r["created_at"],
+        )
+        for r in db.list_audit_log(doc_id)
+    ]
 
 
 @app.get("/api/documents/{doc_id}/final.pdf")
@@ -476,7 +517,9 @@ def signer_page_image(sign_token: str, page_index: int) -> Response:
 
 
 @app.post("/api/sign/{sign_token}/submit", response_model=SubmitResponse)
-def signer_submit(sign_token: str, body: SubmitRequest) -> SubmitResponse:
+def signer_submit(
+    sign_token: str, body: SubmitRequest, request: Request
+) -> SubmitResponse:
     row = _require_signer(sign_token)
     doc_id = row["id"]
     name = body.signer_name.strip()
@@ -531,6 +574,13 @@ def signer_submit(sign_token: str, body: SubmitRequest) -> SubmitResponse:
         db.set_status(doc_id, "completed")
     if written:
         workflow.rebuild_final_pdf(doc_id)
+        db.log_event(
+            "signature_submit",
+            document_id=doc_id,
+            detail=name,
+            ip=_client_ip(request),
+            user_agent=request.headers.get("user-agent", ""),
+        )
 
     person = next(
         (p for p in workflow.person_statuses(doc_id) if p.name == name), None
