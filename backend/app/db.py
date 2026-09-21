@@ -47,6 +47,12 @@ CREATE TABLE IF NOT EXISTS sessions (
     created_at REAL NOT NULL,
     expires_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS login_failures (
+    ip              TEXT PRIMARY KEY,
+    fail_count      INTEGER NOT NULL,
+    first_failed_at REAL NOT NULL,
+    locked_until    REAL
+);
 """
 
 
@@ -250,3 +256,54 @@ def delete_session(session_id: str) -> None:
 def gc_expired_sessions() -> None:
     with writing() as conn:
         conn.execute("DELETE FROM sessions WHERE expires_at < ?", (time.time(),))
+
+
+# --------------------------------------------------------- login rate limit ---
+
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 60 * 10  # 10분 안에 실패가 몰리면 카운트
+LOGIN_LOCKOUT_SECONDS = 60 * 15  # 잠기면 15분
+
+
+def check_login_lock(ip: str) -> Optional[float]:
+    """Returns remaining lockout seconds if the IP is currently locked, else None."""
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT locked_until FROM login_failures WHERE ip = ?", (ip,)
+        ).fetchone()
+    if row and row["locked_until"] and row["locked_until"] > time.time():
+        return row["locked_until"] - time.time()
+    return None
+
+
+def record_login_failure(ip: str) -> None:
+    now = time.time()
+    with writing() as conn:
+        row = conn.execute(
+            "SELECT * FROM login_failures WHERE ip = ?", (ip,)
+        ).fetchone()
+        if row is None or now - row["first_failed_at"] > LOGIN_WINDOW_SECONDS:
+            conn.execute(
+                "INSERT INTO login_failures (ip, fail_count, first_failed_at, locked_until)"
+                " VALUES (?, 1, ?, NULL)"
+                " ON CONFLICT(ip) DO UPDATE SET"
+                " fail_count = 1, first_failed_at = excluded.first_failed_at,"
+                " locked_until = NULL",
+                (ip, now),
+            )
+            return
+        new_count = row["fail_count"] + 1
+        locked_until = (
+            now + LOGIN_LOCKOUT_SECONDS
+            if new_count >= LOGIN_MAX_ATTEMPTS
+            else row["locked_until"]
+        )
+        conn.execute(
+            "UPDATE login_failures SET fail_count = ?, locked_until = ? WHERE ip = ?",
+            (new_count, locked_until, ip),
+        )
+
+
+def clear_login_failures(ip: str) -> None:
+    with writing() as conn:
+        conn.execute("DELETE FROM login_failures WHERE ip = ?", (ip,))

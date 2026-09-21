@@ -114,9 +114,28 @@ def _check_admin(user: Optional[str], pw: Optional[str]) -> None:
         raise HTTPException(401, "아이디 또는 비밀번호가 올바르지 않습니다.")
 
 
+def _client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 @app.post("/api/admin/login")
-def admin_login(body: AdminLogin, response: Response) -> dict:
-    _check_admin(body.username, body.password)
+def admin_login(body: AdminLogin, request: Request, response: Response) -> dict:
+    ip = _client_ip(request)
+    remaining = db.check_login_lock(ip)
+    if remaining is not None:
+        minutes = int(remaining // 60) + 1
+        raise HTTPException(
+            429, f"로그인 시도가 너무 많습니다. {minutes}분 후 다시 시도하세요."
+        )
+    try:
+        _check_admin(body.username, body.password)
+    except HTTPException:
+        db.record_login_failure(ip)
+        raise
+    db.clear_login_failures(ip)
     session_id = db.create_session()
     response.set_cookie(
         SESSION_COOKIE,

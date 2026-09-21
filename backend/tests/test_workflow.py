@@ -80,6 +80,19 @@ def test_upload_requires_admin_credentials(client):
     assert r.status_code == 200 and r.json() == []
 
 
+def test_login_rate_limit(client):
+    for _ in range(5):
+        r = client.post(
+            "/api/admin/login", json={"username": ADMIN_USER, "password": "bad"}
+        )
+        assert r.status_code == 401
+    # 5번 실패했으니 비밀번호가 맞아도 잠겨 있어야 함
+    r = client.post(
+        "/api/admin/login", json={"username": ADMIN_USER, "password": ADMIN_PW}
+    )
+    assert r.status_code == 429
+
+
 def test_login_logout_session(client):
     assert client.get("/api/admin/session").status_code == 401
     _login(client)
